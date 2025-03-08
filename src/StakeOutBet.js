@@ -1,3 +1,4 @@
+// Main StakeOutBet.js
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Clock, AlertTriangle } from 'lucide-react';
 
@@ -27,10 +28,12 @@ const StakeOutBet = () => {
   const [crashPoint, setCrashPoint] = useState(0);
   const [graphPoints, setGraphPoints] = useState([]);
   const [autoCashout, setAutoCashout] = useState(0);
+  const [autoCashoutAmount, setAutoCashoutAmount] = useState(0);
   
   // User interactions
   const [bet, setBet] = useState(100);
   const [winnings, setWinnings] = useState(0);
+  const [cashoutTrigger, setCashoutTrigger] = useState('manual'); // 'manual', 'multiplier', or 'amount'
   
   // History
   const [history, setHistory] = useState([
@@ -83,6 +86,7 @@ const StakeOutBet = () => {
     setGameState('running');
     setGraphPoints([{ time: 0, value: 1 }]);
     startTimeRef.current = Date.now();
+    setCashoutTrigger('manual'); // Reset cashout trigger for new game
     console.log(`Game starting. Will crash at ${newCrashPoint}x`);
   };
   
@@ -93,7 +97,17 @@ const StakeOutBet = () => {
     
     // Check for termination conditions
     if (newMultiplier >= crashPoint) return crash();
-    if (autoCashout > 0 && newMultiplier >= autoCashout) return cashOut();
+    
+    // Check for auto cash-out by multiplier
+    if (autoCashout > 0 && newMultiplier >= autoCashout) {
+      return cashOut('multiplier');
+    }
+    
+    // Check for auto cash-out by amount
+    const currentWinnings = bet * newMultiplier;
+    if (autoCashoutAmount > 0 && currentWinnings >= autoCashoutAmount) {
+      return cashOut('amount');
+    }
     
     setMultiplier(newMultiplier);
     
@@ -106,11 +120,15 @@ const StakeOutBet = () => {
   };
   
   // Player cashes out
-  const cashOut = () => {
+  const cashOut = (trigger = 'manual') => {
     if (gameState !== 'running') return;
     
-    setWinnings(parseFloat((bet * multiplier).toFixed(2)));
+    const cashoutWinnings = parseFloat((bet * multiplier).toFixed(2));
+    setWinnings(cashoutWinnings);
     setGameState('cashed');
+    
+    // Store the trigger type for UI feedback
+    setCashoutTrigger(trigger);
     
     // Cancel animation frame
     cancelAnimationFrame(requestRef.current);
@@ -129,7 +147,22 @@ const StakeOutBet = () => {
   
   // Event handlers
   const handleBetChange = (e) => setBet(Number(e.target.value));
-  const handleAutoCashoutChange = (e) => setAutoCashout(Number(e.target.value));
+  const handleAutoCashoutChange = (e) => {
+    const value = Number(e.target.value);
+    setAutoCashout(value);
+    // Clear amount-based auto cashout when setting multiplier-based
+    if (value > 0) {
+      setAutoCashoutAmount(0);
+    }
+  };
+  const handleAutoCashoutAmountChange = (e) => {
+    const value = Number(e.target.value);
+    setAutoCashoutAmount(value);
+    // Clear multiplier-based auto cashout when setting amount-based
+    if (value > 0) {
+      setAutoCashout(0);
+    }
+  };
   
   // Effect: Game countdown and start
   useEffect(() => {
@@ -162,6 +195,8 @@ const StakeOutBet = () => {
       const timer = setTimeout(() => {
         setGameState('waiting');
         setCountdown(5);
+        // Reset cashout trigger for next game
+        setCashoutTrigger('manual');
       }, 3000);
       return () => clearTimeout(timer);
     }
@@ -217,8 +252,17 @@ const StakeOutBet = () => {
         {gameState === 'cashed' && (
           <div className="absolute inset-0 flex items-center justify-center z-20 bg-green-900 bg-opacity-75">
             <div className="text-center">
-              <div className="text-5xl font-bold text-green-300">CASHED OUT!</div>
-              <div className="mt-2">You won {winnings.toFixed(2)}!</div>
+              <div className="text-5xl font-bold text-green-300">
+                {cashoutTrigger === 'manual' ? 'CASHED OUT!' : 
+                 cashoutTrigger === 'amount' ? 'TARGET REACHED!' : 
+                 'AUTO CASHOUT!'}
+              </div>
+              <div className="mt-2">You won {(bet * multiplier).toFixed(2)}!</div>
+              {cashoutTrigger === 'amount' && (
+                <div className="mt-1 text-yellow-300">
+                  Target amount reached successfully!
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -228,9 +272,11 @@ const StakeOutBet = () => {
       <Controls 
         bet={bet}
         autoCashout={autoCashout}
+        autoCashoutAmount={autoCashoutAmount}
         gameState={gameState}
         onBetChange={handleBetChange}
         onAutoCashoutChange={handleAutoCashoutChange}
+        onAutoCashoutAmountChange={handleAutoCashoutAmountChange}
       />
       
       {/* Action Button */}

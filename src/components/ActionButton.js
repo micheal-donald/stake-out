@@ -1,3 +1,4 @@
+// components/ActionButton.js
 import React from 'react';
 
 const ActionButton = ({ gameState, cashOut, bet, multiplier }) => {

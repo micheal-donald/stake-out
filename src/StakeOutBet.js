@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Clock, AlertTriangle } from 'lucide-react';
+import { useMemo } from 'react';
 
 const StakeOutBet = () => {
   // Game states
-  const [gameState, setGameState] = useState('waiting'); // waiting, running, crashed, cashed
+  const [gameState, setGameState] = useState('waiting');
   const [multiplier, setMultiplier] = useState(1.00);
   const [bet, setBet] = useState(100);
-  const [countdown, setCountdown] = useState(5); // Reduced for testing
+  const [countdown, setCountdown] = useState(5);
   const [history, setHistory] = useState([
     { id: 1, crash: 2.18 },
     { id: 2, crash: 1.49 },
@@ -17,195 +18,215 @@ const StakeOutBet = () => {
   const [autoCashout, setAutoCashout] = useState(0);
   const [winnings, setWinnings] = useState(0);
   const [crashPoint, setCrashPoint] = useState(0);
-  const [startTime, setStartTime] = useState(null);
-  
-  // Plane position state (percentage values)
-  const [planeX, setPlaneX] = useState(0);
-  const [planeY, setPlaneY] = useState(90); // Start at bottom (90%)
-  
-  // Line path for trail
-  const [pathPoints, setPathPoints] = useState([]);
+  const [graphPoints, setGraphPoints] = useState([]);
   
   // Refs
-  const animationRef = useRef();
-  const timerRef = useRef();
+  const requestRef = useRef();
+  const startTimeRef = useRef();
+  const svgRef = useRef(null);
   
   // Generate a random crash point
-  const generateCrashPoint = () => {
-    const e = Math.random();
-    const result = Math.max(1.00, (100 / (1 - 0.93 * e)) / 100);
-    return parseFloat(result.toFixed(2));
-  };
+  const generateCrashPoint = () => parseFloat(Math.max(1, (100 / (1 - 0.93 * Math.random())) / 100).toFixed(2));
   
   // Start the game
   const startGame = () => {
     const newCrashPoint = generateCrashPoint();
     setCrashPoint(newCrashPoint);
-    setMultiplier(1.00);
+    setMultiplier(1);
     setGameState('running');
-    setStartTime(Date.now());
-    setPlaneX(0);
-    setPlaneY(90);
-    setPathPoints([{x: 0, y: 90}]);
+    setGraphPoints([{ time: 0, value: 1 }]);
+    startTimeRef.current = Date.now();
     console.log(`Game starting. Will crash at ${newCrashPoint}x`);
-    
-    // Start the game update loop
-    updateGameLoop();
   };
   
-  // Update game state in a loop
-  // Update game state in a loop
+  // Update game loop using requestAnimationFrame
   const updateGameLoop = () => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-  
-  timerRef.current = setTimeout(() => {
-    if (gameState !== 'running') return;
+    const elapsed = (Date.now() - startTimeRef.current) / 1000;
+    const newMultiplier = parseFloat(Math.pow(1.0316, elapsed).toFixed(2));
     
-    const elapsed = (Date.now() - startTime) / 1000;
+    // Check for termination conditions
+    if (newMultiplier >= crashPoint) return crash();
+    if (autoCashout > 0 && newMultiplier >= autoCashout) return cashOut();
     
-    // Growth formula
-    const newMultiplier = Math.pow(1.0316, elapsed);
-    const roundedMultiplier = parseFloat(newMultiplier.toFixed(2));
+    setMultiplier(newMultiplier);
     
-    setMultiplier(roundedMultiplier);
-    
-    // Update plane position - MODIFIED FOR MORE VISIBLE MOVEMENT
-    // X increases with time - moves right
-    const newX = Math.min(95, elapsed * 10); // Increased speed from 7 to 10
-    // Y decreases with multiplier - moves up (0 is top, 100 is bottom)
-    const newY = Math.max(5, 90 - (roundedMultiplier - 1) * 20); // Increased movement factor from 15 to 20
-    
-    console.log(`Plane position: X=${newX}, Y=${newY}, Multiplier=${roundedMultiplier}`); // Add this to debug
-    
-    setPlaneX(newX);
-    setPlaneY(newY);
-    
-    // Add to path
-    setPathPoints(prev => [...prev, {x: newX, y: newY}]);
-    
-    // Check for auto cashout
-    if (autoCashout > 0 && roundedMultiplier >= autoCashout) {
-      cashOut();
-      return;
+    // Throttle graph updates to improve performance (update every ~100ms)
+    if (Math.floor(elapsed * 10) !== Math.floor((graphPoints.at(-1)?.time || 0) * 10)) {
+      setGraphPoints(prev => [...prev, { time: elapsed, value: newMultiplier }]);
     }
     
-    // Check for crash
-    if (roundedMultiplier >= crashPoint) {
-      crash();
-      return;
-    }
-    
-    // Continue loop
-    updateGameLoop();
-  }, 50); // Keep update at 50ms for smooth movement
-};
+    requestRef.current = requestAnimationFrame(updateGameLoop);
+  };
   
   // Player cashes out
   const cashOut = () => {
     if (gameState !== 'running') return;
     
-    const winAmount = parseFloat((bet * multiplier).toFixed(2));
-    setWinnings(winAmount);
+    setWinnings(parseFloat((bet * multiplier).toFixed(2)));
     setGameState('cashed');
     
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
+    // Cancel animation frame
+    cancelAnimationFrame(requestRef.current);
   };
   
   // Game crashes
   const crash = () => {
     setGameState('crashed');
     
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
+    // Cancel animation frame
+    cancelAnimationFrame(requestRef.current);
     
     // Add to history
-    setHistory(prev => {
-      const newHistory = [{
-        id: prev.length + 1,
-        crash: crashPoint
-      }, ...prev];
-      
-      // Keep only last 10
-      if (newHistory.length > 10) {
-        return newHistory.slice(0, 10);
-      }
-      
-      return newHistory;
-    });
+    setHistory(prev => [{ id: prev.length + 1, crash: crashPoint }, ...prev.slice(0, 9)]);
   };
   
   // Handle between-game countdown
   useEffect(() => {
     if (gameState === 'waiting' && countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown(prev => prev - 1);
-      }, 1000);
-      
+      const timer = setTimeout(() => setCountdown(prev => prev - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (gameState === 'waiting' && countdown === 0) {
-      startGame();
     }
+    if (gameState === 'waiting' && countdown === 0) startGame();
   }, [gameState, countdown]);
+  
+  // Start/stop animation loop based on game state
+  useEffect(() => {
+    if (gameState === 'running') {
+      requestRef.current = requestAnimationFrame(updateGameLoop);
+    }
+    return () => {
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+      }
+    };
+  }, [gameState]);
   
   // Reset countdown after game ends
   useEffect(() => {
-    if (gameState === 'crashed' || gameState === 'cashed') {
+    if (['crashed', 'cashed'].includes(gameState)) {
       const timer = setTimeout(() => {
         setGameState('waiting');
-        setCountdown(5); // Reduced for testing
+        setCountdown(5);
       }, 3000);
-      
       return () => clearTimeout(timer);
     }
   }, [gameState]);
   
-  // Clean up timers on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, []);
-  
   // Determine if the game is getting "dangerous" (for visual cues)
-  const dangerLevel = () => {
-    if (multiplier < 1.5) return 'safe';
-    if (multiplier < 3) return 'medium';
-    if (multiplier < 5) return 'risky';
-    return 'extreme';
-  };
+  const dangerLevel = () => (multiplier < 1.5 ? 'safe' : multiplier < 3 ? 'medium' : multiplier < 5 ? 'risky' : 'extreme');
   
   // Get color based on danger level
-  const getDangerColor = () => {
-    switch(dangerLevel()) {
-      case 'safe': return '#60A5FA'; // blue-400
-      case 'medium': return '#FBBF24'; // yellow-400
-      case 'risky': return '#F97316'; // orange-500
-      case 'extreme': return '#EF4444'; // red-500
-      default: return '#60A5FA';
+  const getDangerColor = () => ({ 
+    safe: '#60A5FA', 
+    medium: '#FBBF24', 
+    risky: '#F97316', 
+    extreme: '#EF4444' 
+  }[dangerLevel()]);
+  
+  // Create SVG path and area from graph points
+  const renderGraph = () => {
+    if (!graphPoints.length) return null;
+  
+    const maxTime = Math.max(10, graphPoints[graphPoints.length - 1].time * 1.1);
+    const maxValue = Math.max(5, multiplier * 1.2);
+  
+    let linePath = '';
+    let areaPath = 'M 0 100';
+  
+    graphPoints.forEach((point, index) => {
+      const x = (point.time / maxTime) * 100;
+      const y = 100 - (point.value / maxValue) * 95;
+  
+      linePath += `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+      areaPath += ` L ${x} ${y}`;
+  
+      if (index === graphPoints.length - 1) {
+        areaPath += ` L ${x} 100 Z`;
+      }
+    });
+  
+    const gridLines = [];
+    for (let i = 1; i <= 5; i++) {
+      const y = 100 - (i / maxValue) * 95;
+      if (y > 0) gridLines.push({ y, value: i });
     }
+  
+    return (
+      <svg
+        ref={svgRef}
+        width="100%"
+        height="100%"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="absolute inset-0"
+      >
+        {gridLines.map((line, i) => (
+          <g key={i}>
+            <line
+              x1="0"
+              y1={line.y}
+              x2="100"
+              y2={line.y}
+              stroke="#374151"
+              strokeWidth="0.2"
+              strokeDasharray="2,2"
+            />
+            <text x="1" y={line.y - 1} fill="#9CA3AF" fontSize="3">
+              {line.value.toFixed(1)}x
+            </text>
+          </g>
+        ))}
+  
+        {[25, 50, 75].map((percent, i) => (
+          <line
+            key={`v${i}`}
+            x1={percent}
+            y1="0"
+            x2={percent}
+            y2="100"
+            stroke="#374151"
+            strokeWidth="0.2"
+            strokeDasharray="2,2"
+          />
+        ))}
+  
+        <path d={areaPath} fill={getDangerColor()} fillOpacity="0.2" />
+        <path d={linePath} fill="none" stroke={getDangerColor()} strokeWidth="0.6" strokeLinecap="round" />
+  
+        {graphPoints.length > 0 && (
+          <circle
+            cx={(graphPoints[graphPoints.length - 1].time / maxTime) * 100}
+            cy={100 - (graphPoints[graphPoints.length - 1].value / maxValue) * 95}
+            r="1.2"
+            fill={getDangerColor()}
+            className={dangerLevel() === 'extreme' ? 'animate-pulse' : ''}
+          />
+        )}
+      </svg>
+    );
   };
   
-  // Create SVG path from points
-  const createPathData = () => {
-    if (pathPoints.length < 2) return '';
+  
+  // Render the multiplier with animation
+  const renderMultiplier = () => {
+    // Determine text size based on multiplier value
+    const baseSize = 36;
+    const growthFactor = Math.min(1.5, 1 + (multiplier - 1) * 0.1);
+    const fontSize = baseSize * growthFactor;
     
-    return pathPoints.reduce((path, point, index) => {
-      // Convert percentage to SVG coordinates
-      const x = point.x + '%';
-      const y = point.y + '%';
-      
-      if (index === 0) {
-        return `M ${x} ${y}`;
-      }
-      return `${path} L ${x} ${y}`;
-    }, '');
+    return (
+    <div
+      className={`absolute font-bold transition-all duration-100 ${dangerLevel() === 'safe' ? 'text-blue-400' : dangerLevel() === 'medium' ? 'text-yellow-400' : dangerLevel() === 'risky' ? 'text-orange-500' : 'text-red-500 animate-pulse'}`}
+      style={{
+        top: '10px',              // Adjust vertical spacing from the top
+        left: '50%',              // Centers horizontally
+        transform: 'translateX(-50%)', // Adjust precisely to center horizontally
+        fontSize: `${fontSize}px`,
+      }}
+    >
+      {multiplier.toFixed(2)}x
+    </div>
+    );
   };
   
   return (
@@ -214,61 +235,11 @@ const StakeOutBet = () => {
       
       {/* Main Game Display */}
       <div className="relative w-full h-64 bg-gray-800 rounded-lg mb-6 overflow-hidden">
-        {/* Background grid */}
-        <div className="absolute inset-0">
-          <svg width="100%" height="100%" className="stroke-gray-700">
-            {/* Horizontal grid lines */}
-            {[20, 40, 60, 80].map(y => (
-              <line key={`h${y}`} x1="0%" y1={`${y}%`} x2="100%" y2={`${y}%`} strokeWidth="1" />
-            ))}
-            {/* Vertical grid lines */}
-            {[20, 40, 60, 80].map(x => (
-              <line key={`v${x}`} x1={`${x}%`} y1="0%" x2={`${x}%`} y2="100%" strokeWidth="1" />
-            ))}
-          </svg>
-        </div>
+        {/* Game graph */}
+        {gameState !== 'waiting' && renderGraph()}
         
-        {/* Game Path */}
-        {gameState !== 'waiting' && (
-          <svg width="100%" height="100%" className="absolute inset-0">
-            <path
-              d={createPathData()}
-              fill="none"
-              stroke={getDangerColor()}
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
-          </svg>
-        )}
-        
-        {/* Plane */}
-        {gameState === 'running' && (
-          <div 
-            style={{ 
-              position: 'absolute',
-              left: `${planeX}%`, 
-              top: `${planeY}%`,
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div style={{ 
-                fontSize: '1.25rem', 
-                fontWeight: 'bold', 
-                marginBottom: '0.25rem',
-                color: getDangerColor()
-              }}>
-                {multiplier.toFixed(2)}x
-              </div>
-              <div style={{ 
-                fontSize: '1.5rem',
-                color: getDangerColor()
-              }}>
-                ✈️
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Multiplier Display */}
+        {gameState === 'running' && renderMultiplier()}
         
         {/* Game States */}
         {gameState === 'waiting' && (

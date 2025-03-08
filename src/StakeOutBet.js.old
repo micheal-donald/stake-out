@@ -1,5 +1,187 @@
+// Updated GameGraph.js with auto cash-out indicator line
+import React from 'react';
+
+const GameGraph = ({ graphPoints, multiplier, dangerLevel, getDangerColor, graphCalculations, svgRef, autoCashout }) => {
+  if (!graphPoints.length || !graphCalculations) return null;
+
+  const { linePath, areaPath, gridLines, lastPoint, maxTime, maxValue } = graphCalculations;
+
+  // Calculate auto cash-out line position if enabled
+  const autoCashoutLineY = autoCashout > 0 
+    ? 100 - (Math.min(autoCashout, maxValue) / maxValue) * 95 
+    : null;
+
+  // Calculate progress to auto cash-out (as percentage)
+  const progressToAutoCashout = autoCashout > 0 
+    ? Math.min(100, (multiplier / autoCashout) * 100) 
+    : 0;
+
+  // Determine if we're getting close to auto cash-out (within 20%)
+  const isApproachingAutoCashout = autoCashout > 0 && 
+    multiplier > (autoCashout * 0.8) && 
+    multiplier < autoCashout;
+
+  return (
+    <svg
+      ref={svgRef}
+      width="100%"
+      height="100%"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="absolute inset-0"
+    >
+      {/* Grid Lines */}
+      {gridLines.map((line, i) => (
+        <g key={`h-grid-${i}`}>
+          <line
+            x1="0"
+            y1={line.y}
+            x2="100"
+            y2={line.y}
+            stroke="#374151"
+            strokeWidth="0.2"
+            strokeDasharray="2,2"
+          />
+          <text x="1" y={line.y - 1} fill="#9CA3AF" fontSize="3">
+            {line.value.toFixed(1)}x
+          </text>
+        </g>
+      ))}
+
+      {/* Vertical Time Markers */}
+      {[25, 50, 75].map((percent, i) => (
+        <line
+          key={`v-grid-${i}`}
+          x1={percent}
+          y1="0"
+          x2={percent}
+          y2="100"
+          stroke="#374151"
+          strokeWidth="0.2"
+          strokeDasharray="2,2"
+        />
+      ))}
+
+      {/* Auto Cash-Out indicator line */}
+      {autoCashout > 0 && autoCashoutLineY && (
+        <g>
+          <line
+            x1="0"
+            y1={autoCashoutLineY}
+            x2="100"
+            y2={autoCashoutLineY}
+            stroke="#10B981"
+            strokeWidth="0.5"
+            strokeDasharray={isApproachingAutoCashout ? "none" : "4,2"}
+            className={isApproachingAutoCashout ? "animate-pulse" : ""}
+          />
+          <rect
+            x="0"
+            y={autoCashoutLineY - 6}
+            width="20"
+            height="6"
+            fill="#10B981"
+            fillOpacity="0.8"
+          />
+          <text
+            x="2"
+            y={autoCashoutLineY - 1.5}
+            fill="white"
+            fontSize="4"
+            fontWeight="bold"
+          >
+            {autoCashout.toFixed(2)}x
+          </text>
+        </g>
+      )}
+
+      {/* Area under curve */}
+      <path d={areaPath} fill={getDangerColor()} fillOpacity="0.2" />
+
+      {/* Graph Line */}
+      <path
+        d={linePath}
+        fill="none"
+        stroke={getDangerColor()}
+        strokeWidth="0.6"
+        strokeLinecap="round"
+      />
+
+      {/* Current Indicator Point */}
+      {graphPoints.length > 0 && (
+        <circle
+          cx={lastPoint.cx}
+          cy={lastPoint.cy}
+          r="1.2"
+          fill={getDangerColor()}
+          className={dangerLevel === 'extreme' || isApproachingAutoCashout ? 'animate-pulse' : ''}
+        />
+      )}
+    </svg>
+  );
+};
+
+export default GameGraph;
+
+// Updated Controls.js with better input formatting
+import React from 'react';
+
+const Controls = ({ bet, autoCashout, gameState, onBetChange, onAutoCashoutChange }) => {
+  // Format the auto cash-out for display
+  const formatAutoCashout = (value) => {
+    // Format to 2 decimal places, but only if not zero
+    return value > 0 ? value.toFixed(2) : value;
+  };
+
+  return (
+    <div className="w-full grid grid-cols-2 gap-4 mb-6">
+      <div>
+        <label className="block text-sm mb-1">Your Bet</label>
+        <input 
+          type="number" 
+          min="10"
+          max="1000"
+          value={bet}
+          onChange={onBetChange}
+          disabled={gameState === 'running'}
+          className="w-full px-3 py-2 bg-gray-700 rounded text-white"
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm mb-1 flex justify-between">
+          <span>Auto Cashout</span>
+          {autoCashout > 0 && gameState !== 'running' && (
+            <span className="text-green-400 text-xs">
+              {formatAutoCashout(autoCashout)}x
+            </span>
+          )}
+        </label>
+        <input 
+          type="number" 
+          min="0"
+          step="0.1"
+          value={formatAutoCashout(autoCashout)}
+          onChange={onAutoCashoutChange}
+          disabled={gameState === 'running'}
+          placeholder="0 = disabled"
+          className={`w-full px-3 py-2 bg-gray-700 rounded ${autoCashout > 0 ? 'text-green-400' : 'text-white'}`}
+        />
+        {autoCashout > 0 && gameState === 'waiting' && (
+          <div className="text-xs text-green-400 mt-1">
+            Will auto cash-out at {formatAutoCashout(autoCashout)}x
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Controls;
+
+// Updated Main StakeOutBet.js file with auto cash-out messaging
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Clock, AlertTriangle } from 'lucide-react';
+import { Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
 // Import helper functions
 import { 
@@ -32,6 +214,9 @@ const StakeOutBet = () => {
   const [bet, setBet] = useState(100);
   const [winnings, setWinnings] = useState(0);
   
+  // Track if auto cash-out was triggered
+  const [autoTriggered, setAutoTriggered] = useState(false);
+  
   // History
   const [history, setHistory] = useState([
     { id: 1, crash: 2.18 },
@@ -62,7 +247,7 @@ const StakeOutBet = () => {
     if (!graphPoints.length) return null;
     
     const maxTime = Math.max(10, graphPoints[graphPoints.length - 1].time * 1.1);
-    const maxValue = Math.max(5, multiplier * 1.2);
+    const maxValue = Math.max(5, Math.max(multiplier, autoCashout) * 1.2);
     
     return {
       linePath: generateLinePath(graphPoints, maxTime, maxValue),
@@ -72,8 +257,10 @@ const StakeOutBet = () => {
         cx: (graphPoints[graphPoints.length - 1].time / maxTime) * 100,
         cy: 100 - (graphPoints[graphPoints.length - 1].value / maxValue) * 95,
       },
+      maxTime,
+      maxValue
     };
-  }, [graphPoints, multiplier]);
+  }, [graphPoints, multiplier, autoCashout]);
   
   // Start the game
   const startGame = () => {
@@ -82,8 +269,13 @@ const StakeOutBet = () => {
     setMultiplier(1);
     setGameState('running');
     setGraphPoints([{ time: 0, value: 1 }]);
+    setAutoTriggered(false);
     startTimeRef.current = Date.now();
     console.log(`Game starting. Will crash at ${newCrashPoint}x`);
+    
+    if (autoCashout > 0) {
+      console.log(`Auto cash-out set to ${autoCashout}x`);
+    }
   };
   
   // Update game loop using requestAnimationFrame
@@ -93,7 +285,12 @@ const StakeOutBet = () => {
     
     // Check for termination conditions
     if (newMultiplier >= crashPoint) return crash();
-    if (autoCashout > 0 && newMultiplier >= autoCashout) return cashOut();
+    
+    // Check for auto cash-out
+    if (autoCashout > 0 && newMultiplier >= autoCashout) {
+      setAutoTriggered(true);
+      return cashOut();
+    }
     
     setMultiplier(newMultiplier);
     
@@ -129,7 +326,11 @@ const StakeOutBet = () => {
   
   // Event handlers
   const handleBetChange = (e) => setBet(Number(e.target.value));
-  const handleAutoCashoutChange = (e) => setAutoCashout(Number(e.target.value));
+  
+  const handleAutoCashoutChange = (e) => {
+    const value = parseFloat(e.target.value);
+    setAutoCashout(isNaN(value) ? 0 : value);
+  };
   
   // Effect: Game countdown and start
   useEffect(() => {
@@ -178,10 +379,11 @@ const StakeOutBet = () => {
           <GameGraph 
             graphPoints={graphPoints}
             multiplier={multiplier}
-            dangerLevel={() => dangerLevel}
-            getDangerColor={() => getDangerColor}
+            dangerLevel={dangerLevel}
+            getDangerColor={getDangerColor}
             graphCalculations={graphCalculations}
             svgRef={svgRef}
+            autoCashout={autoCashout}
           />
         )}
         
@@ -200,6 +402,11 @@ const StakeOutBet = () => {
               <Clock className="mx-auto mb-2" size={48} />
               <div className="text-4xl font-bold">{countdown}s</div>
               <div className="mt-2">Next round starting soon...</div>
+              {autoCashout > 0 && (
+                <div className="mt-2 text-sm text-green-400">
+                  Auto cash-out set to {autoCashout.toFixed(2)}x
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -210,6 +417,11 @@ const StakeOutBet = () => {
               <AlertTriangle className="mx-auto mb-2" size={48} />
               <div className="text-5xl font-bold text-red-300">CRASH!</div>
               <div className="mt-2">Crashed at {crashPoint.toFixed(2)}x</div>
+              {autoCashout > 0 && (
+                <div className="mt-2 text-sm text-yellow-200">
+                  Auto cash-out ({autoCashout.toFixed(2)}x) wasn't reached
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -217,8 +429,18 @@ const StakeOutBet = () => {
         {gameState === 'cashed' && (
           <div className="absolute inset-0 flex items-center justify-center z-20 bg-green-900 bg-opacity-75">
             <div className="text-center">
-              <div className="text-5xl font-bold text-green-300">CASHED OUT!</div>
-              <div className="mt-2">You won {winnings.toFixed(2)}!</div>
+              {autoTriggered ? (
+                <>
+                  <CheckCircle2 className="mx-auto mb-2" size={48} />
+                  <div className="text-4xl font-bold text-green-300">AUTO CASH-OUT!</div>
+                  <div className="mt-2">Successfully cashed out at {multiplier.toFixed(2)}x</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-5xl font-bold text-green-300">CASHED OUT!</div>
+                  <div className="mt-2">You won {winnings.toFixed(2)}!</div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -248,6 +470,9 @@ const StakeOutBet = () => {
       <div className="w-full mt-6 text-xs text-gray-400">
         <p>Game is for demonstration purposes only. No real money is involved.</p>
         <p>Press STAKE OUT to cash out before the multiplier crashes!</p>
+        {autoCashout === 0 && (
+          <p className="text-green-400 mt-1">Set Auto Cash-Out to automatically secure your winnings at a specific multiplier.</p>
+        )}
       </div>
     </div>
   );

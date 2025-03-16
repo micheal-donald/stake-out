@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:15.3-alpine
+    container_name: stakeoutbet-db
+    restart: always
+    environment:
+      POSTGRES_DB: stakeoutbet_db
+      POSTGRES_USER: stakeout_user
+      POSTGRES_PASSWORD: securepassword
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./dbdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - stakeoutnet
+
+  adminer:
+    image: adminer
+    container_name: stakeoutbet_adminer
+    restart: always
+    ports:
+      - 8080:8080
+    networks:
+      - stakeoutnet
+
+networks:
+  stakeoutnet:
+    driver: bridge

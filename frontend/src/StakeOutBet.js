@@ -67,7 +67,7 @@ const StakeOutBet = () => {
     return 'extreme';
   }, [multiplier]);
   
-  const getDangerColor = useMemo(() => {
+  const getDynamicColor = useMemo(() => {
     return DANGER_COLORS[dangerLevel];
   }, [dangerLevel]);
   
@@ -355,14 +355,11 @@ const StakeOutBet = () => {
       {/* Game Display */}
       <div className="relative w-full h-64 bg-gray-800 rounded-lg mb-6 overflow-hidden">
         {/* Game graph */}
-        {gameState === 'running' && graphPoints.length > 0 && (
+        {gameState === 'running' && (
           <GameGraph 
-            graphPoints={graphPoints}
             multiplier={multiplier}
             dangerLevel={dangerLevel}
-            getDangerColor={getDangerColor}
-            graphCalculations={graphCalculations}
-            svgRef={svgRef}
+            getDynamicColor={getDynamicColor}
           />
         )}
         

@@ -43,6 +43,7 @@ logs/
 # PostgreSQL
 *.pgsql
 *.dump
+dbdata/*
 
 # Optional: ignore database or backup files
 *.sqlite

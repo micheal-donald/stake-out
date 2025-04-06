@@ -1,0 +1,9 @@
+### If you want to reset your database
+# Stop the containers
+docker-compose down
+
+# Remove the dbdata directory
+rm -rf ./dbdata
+
+# Start the containers again
+docker-compose up -d

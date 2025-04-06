@@ -1,7 +1,33 @@
 // components/GameGraph.js
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { getDynamicColor, getGlowEffect } from '../utils/gameHelpers';
 
 const GameGraph = ({ graphPoints, multiplier, dangerLevel, getDangerColor, graphCalculations, svgRef }) => {
+  const [dynamicColor, setDynamicColor] = useState(getDangerColor);
+  const [glowEffect, setGlowEffect] = useState('');
+  
+  // Update dynamic color and glow effect with animation frame
+  useEffect(() => {
+    let animationFrameId;
+    
+    const updateVisualEffects = () => {
+      // Update color based on current multiplier and danger level
+      setDynamicColor(getDynamicColor(multiplier, dangerLevel));
+      setGlowEffect(getGlowEffect(multiplier, dangerLevel));
+      
+      // Continue animation loop
+      animationFrameId = requestAnimationFrame(updateVisualEffects);
+    };
+    
+    // Start animation loop
+    animationFrameId = requestAnimationFrame(updateVisualEffects);
+    
+    // Clean up animation frame on unmount
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [multiplier, dangerLevel]);
+  
   if (!graphPoints.length || !graphCalculations) return null;
 
   const { linePath, areaPath, gridLines, lastPoint } = graphCalculations;
@@ -48,13 +74,13 @@ const GameGraph = ({ graphPoints, multiplier, dangerLevel, getDangerColor, graph
       ))}
 
       {/* Area under curve */}
-      <path d={areaPath} fill={getDangerColor()} fillOpacity="0.2" />
+      <path d={areaPath} fill={dynamicColor} fillOpacity="0.2" />
 
       {/* Graph Line */}
       <path
         d={linePath}
         fill="none"
-        stroke={getDangerColor()}
+        stroke={dynamicColor}
         strokeWidth="0.6"
         strokeLinecap="round"
       />
@@ -64,9 +90,13 @@ const GameGraph = ({ graphPoints, multiplier, dangerLevel, getDangerColor, graph
         <circle
           cx={lastPoint.cx}
           cy={lastPoint.cy}
-          r="1.2"
-          fill={getDangerColor()}
-          className={dangerLevel() === 'extreme' ? 'animate-pulse' : ''}
+          r={dangerLevel === 'extreme' ? 1.5 : 1.2}
+          fill={dynamicColor}
+          style={{
+            filter: glowEffect ? `drop-shadow(${glowEffect})` : 'none',
+            transition: 'r 0.2s ease'
+          }}
+          className={dangerLevel === 'extreme' ? 'animate-pulse' : ''}
         />
       )}
     </svg>

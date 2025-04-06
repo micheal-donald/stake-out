@@ -1,4 +1,4 @@
-// components/Controls.js
+// Updated components/Controls.js
 import React from 'react';
 
 const Controls = ({ 
@@ -6,10 +6,15 @@ const Controls = ({
   autoCashout, 
   autoCashoutAmount, 
   gameState, 
+  hasActiveBet,
   onBetChange, 
   onAutoCashoutChange,
   onAutoCashoutAmountChange 
 }) => {
+  // Controls should be disabled during running game if user has active bet
+  // or in any other state except 'waiting'
+  const isDisabled = gameState !== 'waiting' || hasActiveBet;
+  
   return (
     <div className="w-full grid grid-cols-2 gap-4 mb-6">
       <div>
@@ -20,8 +25,10 @@ const Controls = ({
           max="1000"
           value={bet}
           onChange={onBetChange}
-          disabled={gameState === 'running'}
-          className="w-full px-3 py-2 bg-gray-700 rounded text-white"
+          disabled={isDisabled}
+          className={`w-full px-3 py-2 bg-gray-700 rounded text-white ${
+            isDisabled ? 'opacity-60 cursor-not-allowed' : ''
+          }`}
         />
       </div>
       
@@ -34,9 +41,11 @@ const Controls = ({
             step="0.1"
             value={autoCashout}
             onChange={onAutoCashoutChange}
-            disabled={gameState === 'running' || autoCashoutAmount > 0}
+            disabled={isDisabled || autoCashoutAmount > 0}
             placeholder="0 = disabled"
-            className="w-full px-3 py-2 bg-gray-700 rounded text-white"
+            className={`w-full px-3 py-2 bg-gray-700 rounded text-white ${
+              isDisabled || autoCashoutAmount > 0 ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
           />
         </div>
         
@@ -48,9 +57,11 @@ const Controls = ({
             step="1"
             value={autoCashoutAmount}
             onChange={onAutoCashoutAmountChange}
-            disabled={gameState === 'running' || autoCashout > 0}
+            disabled={isDisabled || autoCashout > 0}
             placeholder="0 = disabled"
-            className="w-full px-3 py-2 bg-gray-700 rounded text-white"
+            className={`w-full px-3 py-2 bg-gray-700 rounded text-white ${
+              isDisabled || autoCashout > 0 ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
           />
         </div>
       </div>

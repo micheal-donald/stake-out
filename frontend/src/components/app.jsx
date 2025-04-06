@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
-import axios from 'axios';
 
 // Import components
 import RegisterComponent from './components/RegisterComponent';
 import LoginComponent from './components/LoginComponent';
 import ProfileComponent from './components/ProfileComponent';
 import BetHistoryComponent from './components/BetHistoryComponent';
+
+// Import auth context and provider - note the path with no "./" or "../"
+import { AuthContext, AuthProvider } from './AuthContext';
 
 // Authentication guard component
 const PrivateRoute = ({ children }) => {
@@ -79,91 +81,61 @@ const Dashboard = () => {
   );
 };
 
-// Main app component
-const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
-  
-  // Check for token on app load
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    
-    if (token && storedUser) {
-      setIsAuthenticated(true);
-      setUser(JSON.parse(storedUser));
-      
-      // Set default authorization header
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-  }, []);
-  
-  // Logout function
-  const logout = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      
-      // Call logout API
-      await axios.post('http://localhost:4000/api/logout', {}, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      // Clear local storage and state
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      delete axios.defaults.headers.common['Authorization'];
-      
-      setIsAuthenticated(false);
-      setUser(null);
-    }
-  };
+// Separate component to access context within Router
+const AppContent = () => {
+  const { isAuthenticated, user, logout } = useContext(AuthContext);
   
   return (
-    <Router>
-      <div className="app">
-        <Navbar isAuthenticated={isAuthenticated} logout={logout} user={user} />
-        
-        <div className="container">
-          <Routes>
-            <Route path="/" element={
-              isAuthenticated ? 
-                <PrivateRoute><Dashboard /></PrivateRoute> : 
-                <Navigate to="/login" replace />
-            } />
-            
-            <Route path="/login" element={
-              !isAuthenticated ? 
-                <LoginComponent /> : 
-                <Navigate to="/" replace />
-            } />
-            
-            <Route path="/register" element={
-              !isAuthenticated ? 
-                <RegisterComponent /> : 
-                <Navigate to="/" replace />
-            } />
-            
-            <Route path="/profile" element={
-              <PrivateRoute><ProfileComponent /></PrivateRoute>
-            } />
-            
-            <Route path="/history" element={
-              <PrivateRoute><BetHistoryComponent /></PrivateRoute>
-            } />
-            
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </div>
-        
-        <footer className="footer">
-          <p>&copy; {new Date().getFullYear()} Stake Out Bet. All rights reserved.</p>
-        </footer>
+    <div className="app">
+      <Navbar isAuthenticated={isAuthenticated} logout={logout} user={user} />
+      
+      <div className="container">
+        <Routes>
+          <Route path="/" element={
+            isAuthenticated ? 
+              <Dashboard /> : 
+              <Navigate to="/login" replace />
+          } />
+          
+          <Route path="/login" element={
+            !isAuthenticated ? 
+              <LoginComponent /> : 
+              <Navigate to="/" replace />
+          } />
+          
+          <Route path="/register" element={
+            !isAuthenticated ? 
+              <RegisterComponent /> : 
+              <Navigate to="/" replace />
+          } />
+          
+          <Route path="/profile" element={
+            <PrivateRoute><ProfileComponent /></PrivateRoute>
+          } />
+          
+          <Route path="/history" element={
+            <PrivateRoute><BetHistoryComponent /></PrivateRoute>
+          } />
+          
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </div>
-    </Router>
+      
+      <footer className="footer">
+        <p>&copy; {new Date().getFullYear()} Stake Out Bet. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+};
+
+// Main app component
+const App = () => {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
 };
 

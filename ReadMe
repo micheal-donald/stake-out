@@ -1,0 +1,16 @@
+Start the database
+
+sudo docker compose up
+[+] Running 2/2
+ ✔ Container stakeoutbet-db       Recreated                                                                                                        0.1s
+ ✔ Container stakeoutbet_adminer  Recreated                                                                                                        0.8s
+Attaching to stakeoutbet-db, stakeoutbet_adminer
+stakeoutbet_adminer  | [Sun Apr  6 08:09:40 2025] PHP 8.4.5 Development Server (http://[::]:8080) started
+
+
+Start the Backend
+npm start
+
+Start the Frontend
+
+npm start

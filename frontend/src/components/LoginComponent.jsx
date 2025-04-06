@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../AuthContext';
 
 const LoginComponent = () => {
   const [formData, setFormData] = useState({
@@ -11,6 +12,9 @@ const LoginComponent = () => {
   const [loading, setLoading] = useState(false);
   
   const navigate = useNavigate();
+  
+  // Access the context - make sure the path matches your file structure
+  const authContext = useContext(AuthContext);
 
   const { username, password } = formData;
 
@@ -31,16 +35,19 @@ const LoginComponent = () => {
         password
       });
       
-      // Store token in localStorage
-      localStorage.setItem('token', res.data.token);
-      localStorage.setItem('user', JSON.stringify(res.data.user));
-      
-      // Set Authorization header for future requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
-      
-      // Redirect to dashboard
-      // navigate('/dashboard');
-      navigate('/');
+      if (authContext && authContext.login) {
+        // Use context's login function if available
+        authContext.login(res.data.token, res.data.user);
+        navigate('/');
+      } else {
+        // Fallback to direct localStorage manipulation
+        localStorage.setItem('token', res.data.token);
+        localStorage.setItem('user', JSON.stringify(res.data.user));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+        
+        // Use window.location.href for a full page reload as a backup
+        window.location.href = '/';
+      }
       
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please check your credentials.');

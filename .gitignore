@@ -5,6 +5,8 @@ yarn-debug.log*
 yarn-error.log*
 package-lock.json
 yarn.lock
+node_modules/.cache*
+frontend/node_modules/
 
 # Build output
 build/
@@ -43,6 +45,7 @@ logs/
 # PostgreSQL
 *.pgsql
 *.dump
+dbdata/*
 
 # Optional: ignore database or backup files
 *.sqlite

@@ -62,3 +62,25 @@ CREATE INDEX idx_game_rounds_status ON game_rounds(status);
 -- Grant all privileges explicitly
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO stakeout_user;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO stakeout_user;
+
+-- Create transactions table for wallet functionality
+CREATE TABLE transactions (
+  transaction_id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(user_id),
+  transaction_type VARCHAR(20) NOT NULL CHECK (transaction_type IN ('deposit', 'withdrawal', 'bet', 'win')),
+  amount DECIMAL(12, 2) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'completed', 'failed')),
+  reference_id VARCHAR(255), 
+  description TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for faster lookups
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_transactions_type ON transactions(transaction_type);
+CREATE INDEX idx_transactions_created_at ON transactions(created_at);
+
+-- Grant privileges to the application user
+GRANT ALL PRIVILEGES ON TABLE transactions TO stakeout_user;
+GRANT USAGE, SELECT ON SEQUENCE transactions_transaction_id_seq TO stakeout_user;

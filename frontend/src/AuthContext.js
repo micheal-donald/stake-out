@@ -1,53 +1,58 @@
-import React, { createContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useState, useEffect } from 'react';
 import axios from 'axios';
 
-// Create the authentication context
+// Create context with default values
 export const AuthContext = createContext(null);
 
-// Authentication provider component
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   
-  // Check authentication status
-  const checkAuthStatus = useCallback(() => {
+  useEffect(() => {
+    // Check if user is logged in on first render
     const token = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
     
     if (token && storedUser) {
       setIsAuthenticated(true);
       setUser(JSON.parse(storedUser));
-      
-      // Set default authorization header
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
       setIsAuthenticated(false);
       setUser(null);
-      delete axios.defaults.headers.common['Authorization'];
     }
-  }, []);
-  
-  // Initialize auth state on app load
-  useEffect(() => {
-    checkAuthStatus();
-  }, [checkAuthStatus]);
-  
-  // Login function that can be called from components
-  const login = useCallback((token, userData) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     
-    setIsAuthenticated(true);
-    setUser(userData);
+    setAuthChecked(true);
   }, []);
   
-  // Logout function
-  const logout = useCallback(async () => {
+  const login = async (username, password) => {
+    try {
+      const res = await axios.post('http://localhost:4000/api/login', {
+        username,
+        password
+      });
+      
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
+      
+      setIsAuthenticated(true);
+      setUser(res.data.user);
+      
+      return { success: true };
+    } catch (error) {
+      return { 
+        success: false,
+        error: error.response?.data?.error || 'Login failed. Please check your credentials.'
+      };
+    }
+  };
+  
+  const logout = async () => {
     try {
       const token = localStorage.getItem('token');
       
-      // Call logout API
       await axios.post('http://localhost:4000/api/logout', {}, {
         headers: {
           Authorization: `Bearer ${token}`
@@ -56,7 +61,6 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear local storage and state
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       delete axios.defaults.headers.common['Authorization'];
@@ -64,19 +68,27 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(false);
       setUser(null);
     }
-  }, []);
+  };
   
-  // Auth context value
-  const authContextValue = {
-    isAuthenticated,
-    user,
-    login,
-    logout,
-    checkAuthStatus
+  const updateUserBalance = (newBalance) => {
+    if (user) {
+      const updatedUser = { ...user, balance: newBalance };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
   };
   
   return (
-    <AuthContext.Provider value={authContextValue}>
+    <AuthContext.Provider value={{ 
+      isAuthenticated, 
+      setIsAuthenticated,
+      user, 
+      setUser,
+      login,
+      logout,
+      updateUserBalance,
+      authChecked
+    }}>
       {children}
     </AuthContext.Provider>
   );

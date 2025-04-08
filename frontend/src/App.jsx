@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { AuthProvider, AuthContext } from './AuthContext';
 
 // Import components
 import RegisterComponent from './components/RegisterComponent';
@@ -8,9 +9,10 @@ import LoginComponent from './components/LoginComponent';
 import ProfileComponent from './components/ProfileComponent';
 import BetHistoryComponent from './components/BetHistoryComponent';
 import StakeOutBet from './StakeOutBet';
+import WalletComponent from './components/WalletComponent';
 
 // Authentication guard component
-const AuthContext = createContext();
+// const AuthContext = createContext();
 
 const PrivateRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -33,6 +35,7 @@ const Navbar = ({ isAuthenticated, logout, user }) => {
             </div>
             <Link to="/profile">Profile</Link>
             <Link to="/history">Bet History</Link>
+            <Link to="/wallet">Wallet</Link>
             <button onClick={logout} className="logout-btn">Logout</button>
           </>
         ) : (
@@ -70,6 +73,11 @@ const Dashboard = () => {
         <Link to="/history" className="dashboard-card">
           <h3>Bet History</h3>
           <p>View your betting history and statistics</p>
+        </Link>
+
+        <Link to="/wallet" className="dashboard-card">
+          <h3>Wallet</h3>
+          <p>Deposit and withdraw funds</p>
         </Link>
 
         <div className="dashboard-card betting-card">
@@ -169,6 +177,10 @@ const App = () => {
               <Route path="/history" element={
                 <PrivateRoute><BetHistoryComponent /></PrivateRoute>
               } />
+
+              <Route path="/wallet" element={
+                  <PrivateRoute><WalletComponent /></PrivateRoute>
+                } />
 
               <Route path="/stakeout" element={
                 <PrivateRoute><StakeOutBet /></PrivateRoute>

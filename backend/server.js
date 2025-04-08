@@ -10,6 +10,7 @@ const profileRoutes = require('./routes/profile');
 const settingsRoutes = require('./routes/settings');
 const betsRoutes = require('./routes/bets');
 const gameRoutes = require('./routes/game');
+const walletRoutes = require('./routes/wallet');
 
 // Import socket handlers
 const setupSocketHandlers = require('./sockets');
@@ -41,6 +42,8 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/bet', betsRoutes);
 app.use('/api/game', gameRoutes);
+// Use wallet routes
+app.use('/api/wallet', walletRoutes);
 
 // Initialize the game server
 const gameServer = new GameServer(io);

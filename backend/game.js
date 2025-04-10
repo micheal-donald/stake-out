@@ -1,10 +1,7 @@
 // backend/game.js - The core game engine
 
 const crypto = require('crypto');
-const { Pool } = require('pg');
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL
-});
+const pool = require('./config/db');
 
 class GameServer {
   constructor(io) {

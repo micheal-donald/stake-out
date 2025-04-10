@@ -1,0 +1,53 @@
+/* Navbar Styles */
+
+.navbar {
+  background-color: var(--dark-color);
+  color: var(--light-color);
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.navbar-brand a {
+  color: var(--light-color);
+  font-size: 24px;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.navbar-menu {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.navbar-menu a {
+  color: var(--light-color);
+  text-decoration: none;
+}
+
+.navbar-menu a:hover {
+  text-decoration: underline;
+}
+
+.user-balance {
+  background-color: var(--secondary-color);
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-weight: bold;
+  color: white;
+}
+
+.logout-btn {
+  background-color: transparent;
+  border: 1px solid white;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.logout-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}

@@ -18,6 +18,9 @@ const setupSocketHandlers = require('./sockets');
 // Import the game server
 const GameServer = require('./game');
 
+//Imports for Mpesa
+const mpesaRoutes = require('./routes/mpesa');
+
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
@@ -28,6 +31,7 @@ const io = socketIo(server, {
     credentials: true
   }
 });
+
 
 // Middleware
 app.use(express.json());
@@ -44,6 +48,8 @@ app.use('/api/bet', betsRoutes);
 app.use('/api/game', gameRoutes);
 // Use wallet routes
 app.use('/api/wallet', walletRoutes);
+// Add M-Pesa routes
+app.use('/api/mpesa', mpesaRoutes);
 
 // Initialize the game server
 const gameServer = new GameServer(io);

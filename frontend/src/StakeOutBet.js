@@ -20,6 +20,7 @@ import Controls from './components/Controls';
 import ActionButton from './components/ActionButton';
 import HistoryList from './components/HistoryList';
 
+import './style/index.css';
 import './style/StakeOutBet.css';
 
 // Server URL

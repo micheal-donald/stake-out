@@ -4,9 +4,9 @@ services:
     container_name: stakeoutbet-db
     restart: always
     environment:
-      POSTGRES_DB: stakeoutbet_db
-      POSTGRES_USER: stakeout_user
-      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: ${POSTGRES_DB:-stakeoutbet_db}
+      POSTGRES_USER: ${POSTGRES_USER:-stakeout_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
     ports:
       - "5432:5432"
     volumes:
@@ -21,6 +21,18 @@ services:
     restart: always
     ports:
       - 8080:8080
+    networks:
+      - stakeoutnet
+      
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: stakeoutbet-ngrok
+    restart: always
+    ports:
+      - "4040:4040"
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    command: http host.docker.internal:4000
     networks:
       - stakeoutnet
 

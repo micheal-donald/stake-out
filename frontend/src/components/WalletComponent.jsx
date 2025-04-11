@@ -114,8 +114,8 @@ const WalletComponent = () => {
     setProcessingDeposit(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.post('http://localhost:4000/api/wallet/mpesa-deposit', 
-        { amount, phoneNumber: formattedPhone }, 
+      const res = await axios.post('http://localhost:4000/api/mpesa/stk-push', 
+        { amount, phoneNumber: mpesaPhone }, 
         { headers: { Authorization: `Bearer ${token}` }}
       );
 

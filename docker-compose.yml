@@ -8,10 +8,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-stakeout_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
     ports:
-      - "5432:5432"
-    volumes:
-      - ./dbdata:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - "5434:5432"
+    # volumes:
+    #   - ./dbdata:/var/lib/postgresql/data
+    #   - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - stakeoutnet
 

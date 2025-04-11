@@ -3,18 +3,26 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middlewares/auth');
 const mpesaService = require('../services/mpesa');
+const mpesaUrl = "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials";
 
 // Initiate STK Push
 router.post('/stk-push', authenticateToken, async (req, res) => {
   try {
     const { phoneNumber, amount } = req.body;
     const userId = req.user.userId;
+    const phoneRegex = /^0\d{9}$/;
+    console.log('Received phone number:', phoneNumber);
+    console.log('Received amount:', amount);
     
     if (!phoneNumber || !amount) {
       return res.status(400).json({ error: 'Phone number and amount are required' });
     }
+
+    if (!phoneRegex.test(phoneNumber)) {
+      return res.status(400).json({ error: 'Phone number must be 10 digits and start with 0' });
+    }
     
-    if (amount < 10) {
+    if (amount < 1) {
       return res.status(400).json({ error: 'Minimum deposit amount is 10' });
     }
     
@@ -54,6 +62,8 @@ router.post('/stk-push', authenticateToken, async (req, res) => {
 router.post('/callback', async (req, res) => {
   try {
     await mpesaService.processCallback(req.body);
+    console.log('Callback data:', req.body);
+    console.log(JSON.stringify(req.body));
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Callback processing error:', error);

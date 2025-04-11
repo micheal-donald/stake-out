@@ -23,7 +23,7 @@ class MpesaService {
 
     try {
       const auth = Buffer.from(`${this.consumerKey}:${this.consumerSecret}`).toString('base64');
-      const response = await axios.get(`${this.baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
+      const response = await axios.get(`https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials`, {
         headers: {
           'Authorization': `Basic ${auth}`
         }
@@ -55,7 +55,7 @@ class MpesaService {
       const formattedPhone = phoneNumber.replace(/^(0|\+254)/, '254');
 
       const response = await axios.post(
-        `${this.baseUrl}/mpesa/stkpush/v1/processrequest`,
+        `https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest`,
         {
           BusinessShortCode: this.shortcode,
           Password: password,
@@ -76,7 +76,7 @@ class MpesaService {
           }
         }
       );
-
+      console.log('STK Push response:', response.data);
       return response.data;
     } catch (error) {
       console.error('STK Push error:', error.response?.data || error.message);
@@ -172,7 +172,7 @@ class MpesaService {
       const password = this.generatePassword(timestamp);
   
       const response = await axios.post(
-        `${this.baseUrl}/mpesa/stkpushquery/v1/query`,
+        `https://api.safaricom.co.ke/mpesa/stkpushquery/v1/query`,
         {
           BusinessShortCode: this.shortcode,
           Password: password,

@@ -46,6 +46,7 @@ logs/
 *.pgsql
 *.dump
 dbdata/*
+dbdata/
 
 # Optional: ignore database or backup files
 *.sqlite

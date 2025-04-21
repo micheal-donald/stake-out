@@ -76,11 +76,29 @@ CREATE TABLE transactions (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE mpesa_transactions (
+  transaction_id INTEGER PRIMARY KEY REFERENCES transactions(transaction_id),
+  checkout_request_id VARCHAR(50) NOT NULL,
+  mpesa_receipt_number VARCHAR(30),
+  phone_number VARCHAR(15) NOT NULL,
+  transaction_date TIMESTAMP,
+  result_code VARCHAR(5),
+  result_desc TEXT,
+  raw_callback JSONB,
+  stk_status VARCHAR(20) DEFAULT 'initiated', -- initiated, delivered, completed, failed, timeout
+  reconciliation_status VARCHAR(20) DEFAULT 'pending', -- pending, reconciled, disputed
+  last_query_time TIMESTAMP,
+  retry_count INTEGER DEFAULT 0
+);
+
 -- Create indexes for faster lookups
 CREATE INDEX idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX idx_transactions_type ON transactions(transaction_type);
 CREATE INDEX idx_transactions_created_at ON transactions(created_at);
 
+CREATE INDEX idx_mpesa_checkout_id ON mpesa_transactions(checkout_request_id);
+CREATE INDEX idx_mpesa_receipt ON mpesa_transactions(mpesa_receipt_number);
+CREATE INDEX idx_mpesa_phone ON mpesa_transactions(phone_number);
 -- Grant privileges to the application user
 GRANT ALL PRIVILEGES ON TABLE transactions TO stakeout_user;
 GRANT USAGE, SELECT ON SEQUENCE transactions_transaction_id_seq TO stakeout_user;

@@ -40,6 +40,15 @@ app.use(cors({
   credentials: true
 }));
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'StakeOut Bet API is running',
+    version: '1.0.0'
+  });
+});
+
 // Routes
 app.use('/api', authRoutes);
 app.use('/api/profile', profileRoutes);
@@ -50,6 +59,7 @@ app.use('/api/game', gameRoutes);
 app.use('/api/wallet', walletRoutes);
 // Add M-Pesa routes
 app.use('/api/mpesa', mpesaRoutes);
+
 // Initialize the game server
 const gameServer = new GameServer(io);
 

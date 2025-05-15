@@ -85,10 +85,14 @@ CREATE TABLE mpesa_transactions (
   result_code VARCHAR(5),
   result_desc TEXT,
   raw_callback JSONB,
-  stk_status VARCHAR(20) DEFAULT 'initiated', -- initiated, delivered, completed, failed, timeout
+  stk_status VARCHAR(20) DEFAULT 'initiated', -- initiated, delivered, completed, failed, timeout, canceled
   reconciliation_status VARCHAR(20) DEFAULT 'pending', -- pending, reconciled, disputed
   last_query_time TIMESTAMP,
-  retry_count INTEGER DEFAULT 0
+  retry_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP,
+  CONSTRAINT unique_checkout_request_id UNIQUE (checkout_request_id)
 );
 
 -- Create indexes for faster lookups
@@ -96,9 +100,26 @@ CREATE INDEX idx_transactions_user_id ON transactions(user_id);
 CREATE INDEX idx_transactions_type ON transactions(transaction_type);
 CREATE INDEX idx_transactions_created_at ON transactions(created_at);
 
+-- Create indexes for faster lookups
 CREATE INDEX idx_mpesa_checkout_id ON mpesa_transactions(checkout_request_id);
 CREATE INDEX idx_mpesa_receipt ON mpesa_transactions(mpesa_receipt_number);
 CREATE INDEX idx_mpesa_phone ON mpesa_transactions(phone_number);
+CREATE INDEX idx_mpesa_status ON mpesa_transactions(stk_status);
+CREATE INDEX idx_mpesa_expires ON mpesa_transactions(expires_at);
+
+-- Add trigger to automatically set expiration timestamp (5 minutes from creation)
+CREATE OR REPLACE FUNCTION set_mpesa_expiry() RETURNS TRIGGER AS $$
+BEGIN
+    NEW.expires_at := NEW.created_at + interval '5 minutes';
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_mpesa_expiry_trigger
+BEFORE INSERT ON mpesa_transactions
+FOR EACH ROW
+EXECUTE FUNCTION set_mpesa_expiry();
+
 -- Grant privileges to the application user
 GRANT ALL PRIVILEGES ON TABLE transactions TO stakeout_user;
 GRANT USAGE, SELECT ON SEQUENCE transactions_transaction_id_seq TO stakeout_user;

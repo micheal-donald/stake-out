@@ -12,7 +12,13 @@ import {
   Smartphone,
   Check,
   X,
-  RefreshCw
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Clock as ClockIcon,
+  XCircle,
+  CheckCircle
 } from 'lucide-react';
 import '../style/WalletComponent.css';
 
@@ -24,28 +30,40 @@ const WalletComponent = () => {
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [transactions, setTransactions] = useState([]);
+  const [pendingTransactions, setPendingTransactions] = useState([]);
+  const [pendingExpanded, setPendingExpanded] = useState(true);
+  
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
     totalCount: 0,
     hasMore: false
   });
+  
   const [loading, setLoading] = useState(true);
   const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const [pendingLoading, setPendingLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeTab, setActiveTab] = useState('deposit');
   const [depositMethod, setDepositMethod] = useState(null);
   const [mpesaPhone, setMpesaPhone] = useState('');
   const [processingDeposit, setProcessingDeposit] = useState(false);
-  const [currentTransaction, setCurrentTransaction] = useState(null);
-  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [checkingAll, setCheckingAll] = useState(false);
 
   const navigate = useNavigate();
 
   // Load wallet data on component mount
   useEffect(() => {
     fetchWalletData();
+    
+    // Set up interval to check for pending transactions every 30 seconds
+    const interval = setInterval(() => {
+      fetchPendingTransactions();
+    }, 30000);
+    
+    // Clean up interval on unmount
+    return () => clearInterval(interval);
   }, [user, navigate]);
 
   // Function to fetch wallet balance and transaction data
@@ -66,8 +84,9 @@ const WalletComponent = () => {
       }
       setLoading(false);
       
-      // Always fetch transactions
+      // Always fetch transactions and pending transactions
       fetchTransactions();
+      fetchPendingTransactions();
     } catch (err) {
       console.error('Error fetching wallet data:', err);
       setError('Failed to load wallet data. Please try again.');
@@ -89,23 +108,37 @@ const WalletComponent = () => {
       setTransactions(res.data.transactions);
       setPagination(res.data.pagination);
       setTransactionsLoading(false);
-      
-      // Check if there's a pending M-Pesa transaction
-      const pendingMpesa = res.data.transactions.find(
-        t => t.transaction_type === 'deposit' && 
-        t.status === 'pending' && 
-        t.description && 
-        t.description.includes('M-Pesa')
-      );
-      
-      if (pendingMpesa) {
-        setCurrentTransaction(pendingMpesa);
-      } else {
-        setCurrentTransaction(null);
-      }
     } catch (err) {
       console.error('Error fetching transactions:', err);
       setTransactionsLoading(false);
+    }
+  };
+  
+  // Function to fetch pending M-Pesa transactions
+  const fetchPendingTransactions = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      setPendingLoading(true);
+      const res = await axios.get('http://localhost:4000/api/mpesa/pending-transactions', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setPendingTransactions(res.data.transactions || []);
+      setPendingLoading(false);
+      
+      // If we have new completed transactions, refresh the balance
+      const hasPendingCompleted = res.data.transactions.some(t => 
+        t.stk_status === 'completed' && t.transaction_status !== 'completed'
+      );
+      
+      if (hasPendingCompleted) {
+        refreshBalance();
+      }
+    } catch (err) {
+      console.error('Error fetching pending transactions:', err);
+      setPendingLoading(false);
     }
   };
 
@@ -114,6 +147,26 @@ const WalletComponent = () => {
     if (newPage > 0 && newPage <= pagination.totalPages) {
       setPagination(prev => ({ ...prev, currentPage: newPage }));
       fetchTransactions(newPage);
+    }
+  };
+
+  // Refresh just the balance
+  const refreshBalance = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get('http://localhost:4000/api/wallet/balance', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const newBalance = parseFloat(res.data.balance) || 0;
+      setBalance(newBalance);
+      
+      // Update in auth context if available
+      if (updateUserBalance) {
+        updateUserBalance(newBalance);
+      }
+    } catch (err) {
+      console.error('Error refreshing balance:', err);
     }
   };
 
@@ -150,25 +203,12 @@ const WalletComponent = () => {
       // Set success message with transaction ID
       setSuccess('M-Pesa payment request sent! Check your phone to complete the transaction.');
       
-      // Store transaction info for status checking
-      if (res.data.transactionId) {
-        setCurrentTransaction({
-          transaction_id: res.data.transactionId,
-          request_id: res.data.requestId,
-          amount: amount,
-          status: 'pending'
-        });
-        
-        // Start checking status after 5 seconds
-        setTimeout(() => checkTransactionStatus(res.data.requestId), 5000);
-      }
-      
       // Reset form
       setDepositAmount('');
       setMpesaPhone('');
       
-      // Refresh transactions list
-      fetchTransactions();
+      // Refresh pending transactions list to show the new one
+      fetchPendingTransactions();
     } catch (err) {
       setError(err.response?.data?.error || 'M-Pesa deposit failed. Please try again.');
     } finally {
@@ -176,42 +216,112 @@ const WalletComponent = () => {
     }
   };
 
-  // Check M-Pesa transaction status
-  const checkTransactionStatus = async (requestId) => {
-    if (!requestId || checkingStatus) return;
-    
-    setCheckingStatus(true);
+  // Check transaction status
+  const checkTransactionStatus = async (checkoutRequestId, transactionId) => {
     try {
+      // Find the transaction in the pendingTransactions array
+      const transaction = pendingTransactions.find(tx => tx.transaction_id === transactionId);
+      if (!transaction) return;
+      
+      // Update the transaction's checking status
+      setPendingTransactions(prev => prev.map(tx => 
+        tx.transaction_id === transactionId 
+          ? { ...tx, isChecking: true } 
+          : tx
+      ));
+      
       const token = localStorage.getItem('token');
-      const res = await axios.get(`http://localhost:4000/api/mpesa/transaction-status/${requestId}`, {
+      const res = await axios.get(`http://localhost:4000/api/mpesa/transaction-status/${checkoutRequestId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      if (res.data.success) {
-        // Transaction successful
+      // Update the transaction status in the list
+      setPendingTransactions(prev => prev.map(tx => 
+        tx.transaction_id === transactionId
+          ? { 
+              ...tx, 
+              isChecking: false,
+              stk_status: res.data.transaction.stkStatus,
+              transaction_status: res.data.transaction.status,
+              result_desc: res.data.description
+            } 
+          : tx
+      ));
+      
+      // If transaction is now completed, refresh balance and transactions
+      if (res.data.transaction.stkStatus === 'completed') {
         setSuccess('Payment completed successfully!');
-        fetchWalletData(); // Refresh wallet data
-        setCurrentTransaction(null);
-      } else if (res.data.resultCode === '1032') {
-        // Transaction cancelled by user
-        setError('Transaction was cancelled or timed out.');
-        setCurrentTransaction(prev => prev ? {...prev, status: 'failed'} : null);
-      } else if (res.data.resultCode !== '2001') { // Not 'pending'
-        // Failed with other error
-        setError(`Transaction failed: ${res.data.status}`);
-        setCurrentTransaction(prev => prev ? {...prev, status: 'failed'} : null);
-      } else {
-        // Still pending, check again in 5 seconds
-        setTimeout(() => checkTransactionStatus(requestId), 5000);
+        refreshBalance();
+        fetchTransactions();
+        
+        // Remove from pending after a short delay
+        setTimeout(() => {
+          setPendingTransactions(prev => 
+            prev.filter(tx => tx.transaction_id !== transactionId)
+          );
+        }, 5000);
+      } else if (['failed', 'canceled', 'timeout'].includes(res.data.transaction.stkStatus)) {
+        setError(`Transaction ${res.data.transaction.stkStatus}: ${res.data.description}`);
       }
     } catch (err) {
       console.error('Error checking transaction status:', err);
-      // Still try again in 5 seconds if we have a current transaction
-      if (currentTransaction) {
-        setTimeout(() => checkTransactionStatus(requestId), 5000);
-      }
+      
+      // Update transaction to reflect the error
+      setPendingTransactions(prev => prev.map(tx => 
+        tx.transaction_id === transactionId
+          ? { ...tx, isChecking: false, error: err.message } 
+          : tx
+      ));
+    }
+  };
+  
+  // Cancel a transaction
+  const cancelTransaction = async (transactionId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`http://localhost:4000/api/mpesa/cancel-transaction/${transactionId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Update the transaction in the list
+      setPendingTransactions(prev => prev.map(tx => 
+        tx.transaction_id === transactionId
+          ? { ...tx, stk_status: 'canceled', transaction_status: 'failed' } 
+          : tx
+      ));
+      
+      setSuccess('Transaction cancelled successfully');
+      
+      // Remove from pending after a short delay
+      setTimeout(() => {
+        setPendingTransactions(prev => 
+          prev.filter(tx => tx.transaction_id !== transactionId)
+        );
+      }, 3000);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to cancel transaction');
+    }
+  };
+  
+  // Check all pending transactions at once
+  const checkAllPendingTransactions = async () => {
+    try {
+      setCheckingAll(true);
+      const token = localStorage.getItem('token');
+      await axios.post('http://localhost:4000/api/mpesa/check-pending', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Refresh data
+      refreshBalance();
+      fetchTransactions();
+      fetchPendingTransactions();
+      
+      setSuccess('All pending transactions checked');
+    } catch (err) {
+      setError('Failed to check all transactions');
     } finally {
-      setCheckingStatus(false);
+      setCheckingAll(false);
     }
   };
 
@@ -289,6 +399,22 @@ const WalletComponent = () => {
     };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
+  
+  // Format time remaining for transaction
+  const formatTimeRemaining = (expiresAt) => {
+    const expires = new Date(expiresAt);
+    const now = new Date();
+    
+    if (expires <= now) {
+      return 'Expired';
+    }
+    
+    const secondsRemaining = Math.floor((expires - now) / 1000);
+    const minutes = Math.floor(secondsRemaining / 60);
+    const seconds = secondsRemaining % 60;
+    
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
 
   // Get appropriate icon for transaction type
   const getTransactionIcon = (type) => {
@@ -300,105 +426,221 @@ const WalletComponent = () => {
       default: return <Clock size={20} className="transaction-icon" />;
     }
   };
+  
+  // Get status icon for pending transaction
+  const getStatusIcon = (status) => {
+    switch(status) {
+      case 'completed':
+        return <CheckCircle size={18} className="status-icon completed" />;
+      case 'failed':
+        return <XCircle size={18} className="status-icon failed" />;
+      case 'canceled':
+        return <XCircle size={18} className="status-icon canceled" />;
+      case 'timeout':
+        return <ClockIcon size={18} className="status-icon timeout" />;
+      default:
+        return <Clock size={18} className="status-icon pending" />;
+    }
+  };
+
+  // Render pending M-Pesa transactions section
+  const renderPendingTransactions = () => {
+    if (pendingTransactions.length === 0) {
+      return null;
+    }
+    
+    return (
+      <div className="pending-transactions-section">
+        <div 
+          className="section-header" 
+          onClick={() => setPendingExpanded(!pendingExpanded)}
+        >
+          <div className="section-title">
+            <Clock size={20} />
+            <h3>Pending M-Pesa Transactions</h3>
+            <span className="transaction-count">{pendingTransactions.length}</span>
+          </div>
+          {pendingExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        </div>
+        
+        {pendingExpanded && (
+          <>
+            <div className="pending-actions">
+              <button
+                className="check-all-button"
+                onClick={checkAllPendingTransactions}
+                disabled={checkingAll || pendingTransactions.length === 0}
+              >
+                {checkingAll ? <RefreshCw size={16} className="spin" /> : <RefreshCw size={16} />}
+                Check All Transactions
+              </button>
+            </div>
+            
+            <div className="pending-list">
+              {pendingTransactions.map(transaction => {
+                const isExpired = new Date(transaction.expires_at) < new Date();
+                const isPending = ['initiated', 'delivered'].includes(transaction.stk_status);
+                
+                return (
+                  <div 
+                    key={transaction.transaction_id} 
+                    className={`pending-transaction-card ${transaction.stk_status}`}
+                  >
+                    <div className="card-header">
+                      <div className="transaction-status-wrapper">
+                        {getStatusIcon(transaction.stk_status)}
+                        <span className="transaction-status-text">
+                          {transaction.stk_status.charAt(0).toUpperCase() + transaction.stk_status.slice(1)}
+                        </span>
+                      </div>
+                      <div className="transaction-amount">
+                        ${parseFloat(transaction.amount).toFixed(2)}
+                      </div>
+                    </div>
+                    
+                    <div className="card-details">
+                      <div className="detail-row">
+                        <span className="detail-label">Phone:</span>
+                        <span className="detail-value">{transaction.phone_number}</span>
+                      </div>
+                      <div className="detail-row">
+                        <span className="detail-label">Created:</span>
+                        <span className="detail-value">{formatDate(transaction.created_at)}</span>
+                      </div>
+                      {isPending && !isExpired && (
+                        <div className="detail-row">
+                          <span className="detail-label">Expires in:</span>
+                          <span className="detail-value countdown">{formatTimeRemaining(transaction.expires_at)}</span>
+                        </div>
+                      )}
+                      {transaction.result_desc && (
+                        <div className="detail-row">
+                          <span className="detail-label">Status:</span>
+                          <span className="detail-value">{transaction.result_desc}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="card-actions">
+                      {isPending && !isExpired && (
+                        <>
+                          <button 
+                            className="check-button"
+                            onClick={() => checkTransactionStatus(transaction.checkout_request_id, transaction.transaction_id)}
+                            disabled={transaction.isChecking}
+                          >
+                            {transaction.isChecking ? 
+                              <RefreshCw size={16} className="spin" /> : 
+                              <RefreshCw size={16} />
+                            }
+                            Check Status
+                          </button>
+                          <button 
+                            className="cancel-button"
+                            onClick={() => cancelTransaction(transaction.transaction_id)}
+                          >
+                            <X size={16} />
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {(isExpired || ['failed', 'canceled', 'timeout'].includes(transaction.stk_status)) && (
+                        <button 
+                          className="remove-button"
+                          onClick={() => setPendingTransactions(prev => 
+                            prev.filter(t => t.transaction_id !== transaction.transaction_id)
+                          )}
+                        >
+                          <X size={16} />
+                          Dismiss
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   // Render deposit tab form
   const renderDepositForm = () => (
     <div className="deposit-form">
       <h3>Deposit Funds</h3>
       
-      {currentTransaction && currentTransaction.status === 'pending' ? (
-        <div className="pending-transaction">
-          <h4>Pending M-Pesa Transaction</h4>
-          <p>Amount: ${parseFloat(currentTransaction.amount).toFixed(2)}</p>
-          <p>Status: {checkingStatus ? 'Checking status...' : 'Waiting for confirmation'}</p>
-          <div className="transaction-actions">
-            <button 
-              className="check-status-button" 
-              onClick={() => checkTransactionStatus(currentTransaction.request_id)}
-              disabled={checkingStatus}
-            >
-              {checkingStatus ? <RefreshCw size={16} className="spin" /> : 'Check Status'}
-            </button>
-            <button className="refresh-button" onClick={refreshWallet}>
-              Refresh Wallet
-            </button>
-          </div>
-          <p className="note">Note: If you've already completed the payment on your phone, click "Refresh Wallet" to update your balance.</p>
+      <div className="payment-method-selector">
+        <label>Select Payment Method:</label>
+        <div className="method-options">
+          <button 
+            className={`method-option ${depositMethod === 'mpesa' ? 'active' : ''}`} 
+            onClick={() => setDepositMethod('mpesa')}
+          >
+            <Smartphone size={18} /> M-Pesa
+          </button>
+          <button 
+            className={`method-option ${depositMethod === 'card' ? 'active' : ''}`} 
+            onClick={() => setDepositMethod('card')}
+          >
+            <CreditCard size={18} /> Card
+          </button>
         </div>
-      ) : (
-        <>
-          <div className="payment-method-selector">
-            <label>Select Payment Method:</label>
-            <div className="method-options">
-              <button 
-                className={`method-option ${depositMethod === 'mpesa' ? 'active' : ''}`} 
-                onClick={() => setDepositMethod('mpesa')}
-              >
-                <Smartphone size={18} /> M-Pesa
-              </button>
-              <button 
-                className={`method-option ${depositMethod === 'card' ? 'active' : ''}`} 
-                onClick={() => setDepositMethod('card')}
-              >
-                <CreditCard size={18} /> Card
-              </button>
+      </div>
+
+      {depositMethod && (
+        <div className="method-details">
+          <div className="form-group">
+            <label>Amount</label>
+            <div className="input-with-prefix">
+              <span className="input-prefix">$</span>
+              <input 
+                type="number" 
+                value={depositAmount} 
+                onChange={(e) => setDepositAmount(e.target.value)} 
+                min="1" 
+                step="0.01" 
+                placeholder="Enter amount" 
+              />
             </div>
           </div>
 
-          {depositMethod && (
-            <div className="method-details">
+          {depositMethod === 'mpesa' && (
+            <>
               <div className="form-group">
-                <label>Amount</label>
-                <div className="input-with-prefix">
-                  <span className="input-prefix">$</span>
+                <label>M-Pesa Phone Number</label>
+                <div className="input-with-icon">
+                  <Phone size={18} className="input-icon" />
                   <input 
-                    type="number" 
-                    value={depositAmount} 
-                    onChange={(e) => setDepositAmount(e.target.value)} 
-                    min="1" 
-                    step="0.01" 
-                    placeholder="Enter amount" 
+                    type="text" 
+                    value={mpesaPhone} 
+                    onChange={(e) => setMpesaPhone(e.target.value)} 
+                    placeholder="e.g. 0712345678" 
                   />
                 </div>
+                <div className="input-hint">Enter your phone number in format: 07XXXXXXXX</div>
               </div>
-
-              {depositMethod === 'mpesa' && (
-                <>
-                  <div className="form-group">
-                    <label>M-Pesa Phone Number</label>
-                    <div className="input-with-icon">
-                      <Phone size={18} className="input-icon" />
-                      <input 
-                        type="text" 
-                        value={mpesaPhone} 
-                        onChange={(e) => setMpesaPhone(e.target.value)} 
-                        placeholder="e.g. 0712345678" 
-                      />
-                    </div>
-                    <div className="input-hint">Enter your phone number in format: 07XXXXXXXX</div>
-                  </div>
-                  <p className="form-note">You'll receive an M-Pesa payment prompt on your phone to complete the transaction.</p>
-                </>
-              )}
-
-              {depositMethod === 'card' && (
-                <p className="form-note">This is a simulated deposit for demonstration purposes.</p>
-              )}
-
-              <button 
-                className="deposit-button" 
-                onClick={handleDeposit} 
-                disabled={
-                  processingDeposit || 
-                  !depositAmount || 
-                  (depositMethod === 'mpesa' && !mpesaPhone)
-                }
-              >
-                {processingDeposit ? 'Processing...' : 'Deposit Funds'}
-              </button>
-            </div>
+              <p className="form-note">You'll receive an M-Pesa payment prompt on your phone to complete the transaction.</p>
+            </>
           )}
-        </>
+
+          {depositMethod === 'card' && (
+            <p className="form-note">This is a simulated deposit for demonstration purposes.</p>
+          )}
+
+          <button 
+            className="deposit-button" 
+            onClick={handleDeposit} 
+            disabled={
+              processingDeposit || 
+              !depositAmount || 
+              (depositMethod === 'mpesa' && !mpesaPhone)
+            }
+          >
+            {processingDeposit ? 'Processing...' : 'Deposit Funds'}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -465,6 +707,9 @@ const WalletComponent = () => {
           <span>{success}</span>
         </div>
       )}
+
+      {/* Render pending transactions section first */}
+      {renderPendingTransactions()}
 
       <div className="wallet-tabs">
         <button 

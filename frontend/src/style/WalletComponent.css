@@ -637,3 +637,212 @@
 .alert {
   animation: slideIn 0.3s ease-out;
 }
+
+/* Add these styles to your existing WalletComponent.css file */
+
+/* Pending Transactions Section */
+.pending-transactions-section {
+  background-color: var(--card-bg);
+  border-radius: 0.75rem;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s;
+}
+
+.section-header:hover {
+  background-color: var(--hover-bg);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pending-actions {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pending-list {
+  padding: 1rem 1.5rem;
+}
+
+.pending-transaction-card {
+  background-color: var(--darker-bg);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  transition: transform 0.2s;
+  border: 1px solid var(--border-color);
+}
+
+.pending-transaction-card:hover {
+  transform: translateY(-2px);
+}
+
+.pending-transaction-card.completed {
+  border-left: 4px solid var(--accent-green);
+}
+
+.pending-transaction-card.failed,
+.pending-transaction-card.canceled,
+.pending-transaction-card.timeout {
+  border-left: 4px solid var(--accent-red);
+}
+
+.pending-transaction-card.initiated,
+.pending-transaction-card.delivered {
+  border-left: 4px solid var(--accent-yellow);
+}
+
+.card-header {
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.transaction-status-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-icon {
+  display: inline-block;
+}
+
+.status-icon.completed {
+  color: var(--accent-green);
+}
+
+.status-icon.failed,
+.status-icon.canceled,
+.status-icon.timeout {
+  color: var(--accent-red);
+}
+
+.status-icon.pending {
+  color: var(--accent-yellow);
+}
+
+.transaction-status-text {
+  font-weight: 600;
+}
+
+.card-details {
+  padding: 1rem;
+}
+
+.detail-row {
+  display: flex;
+  margin-bottom: 0.5rem;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: var(--muted-text);
+  width: 30%;
+  flex-shrink: 0;
+}
+
+.detail-value {
+  color: var(--light-text);
+}
+
+.countdown {
+  font-weight: 700;
+  color: var(--accent-yellow);
+}
+
+.card-actions {
+  padding: 1rem;
+  display: flex;
+  gap: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Button styles for cancel, check, and remove buttons */
+.check-button,
+.cancel-button,
+.check-all-button,
+.remove-button {
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.check-button {
+  background-color: var(--darker-bg);
+  color: var(--light-text);
+  border: 1px solid var(--border-color);
+  flex: 1;
+}
+
+.check-button:hover:not(:disabled) {
+  background-color: var(--hover-bg);
+}
+
+.cancel-button,
+.remove-button {
+  background-color: var(--darker-bg);
+  color: var(--accent-red);
+  border: 1px solid var(--accent-red);
+  flex: 1;
+}
+
+.cancel-button:hover,
+.remove-button:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+.check-all-button {
+  background-color: var(--darker-bg);
+  color: var(--light-text);
+  border: 1px solid var(--border-color);
+  margin-bottom: 1rem;
+}
+
+.check-all-button:hover:not(:disabled) {
+  background-color: var(--hover-bg);
+}
+
+.check-button:disabled,
+.check-all-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .card-actions {
+    flex-direction: column;
+  }
+  
+  .check-button,
+  .cancel-button,
+  .remove-button {
+    width: 100%;
+  }
+}

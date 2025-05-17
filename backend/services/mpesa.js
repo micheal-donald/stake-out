@@ -172,9 +172,10 @@ class MpesaService {
     
     const client = await pool.connect();
     try {
-      // Extract data from callback
-      if (!callbackData.Body || !callbackData.Body.stkCallback) {
-        throw new Error('Invalid callback data format - missing Body.stkCallback');
+      // Enhanced validation for required fields
+      if (!callbackData.Body?.stkCallback?.CheckoutRequestID || 
+          typeof callbackData.Body?.stkCallback?.ResultCode === 'undefined') {
+        throw new Error('Invalid callback data format - missing required fields');
       }
       
       const Body = callbackData.Body;
@@ -202,66 +203,92 @@ class MpesaService {
       
       console.log(`Found transaction ID: ${transaction.transaction_id} for user ID: ${userId}`);
       
+      // Check if this transaction has already been processed (idempotency) - FIXED IN clause
+      const processedResult = await client.query(
+        'SELECT status FROM transactions WHERE reference_id = $1 AND status = ANY($2)',
+        [checkoutRequestId, ['completed', 'failed']]
+      );
+      
+      if (processedResult.rows.length > 0) {
+        console.log(`Transaction ${checkoutRequestId} already processed with status: ${processedResult.rows[0].status}`);
+        return { 
+          success: processedResult.rows[0].status === 'completed',
+          message: 'Transaction already processed',
+          transactionId: transaction.transaction_id
+        };
+      }
+      
       await client.query('BEGIN');
-  
+    
+      // Define result codes map for better error messages
+      const resultMessages = {
+        0: 'Transaction processed successfully',
+        1: 'Insufficient balance',
+        1032: 'Request cancelled by user',
+        1037: 'Transaction timeout. User did not respond to the payment prompt',
+        1001: 'Invalid MSISDN (phone number)',
+        17: 'User has insufficient funds',
+        26: 'MSISDN blacklisted for the service',
+        2001: 'The initiator information is invalid',
+        // Add more codes as needed
+      };
+      
+      const resultMessage = resultMessages[resultCode] || stkCallback.ResultDesc;
+      
       if (parseInt(resultCode) === 0) {
         console.log(`Transaction ${checkoutRequestId} completed successfully`);
         
-        // Extract additional details from the callback for better record-keeping
-        let mpesaReceiptNumber = '';
-        let phoneNumber = '';
+        // Extract metadata more safely with a helper function
+        const metadata = stkCallback.CallbackMetadata?.Item || [];
+        const getMetadataValue = (name) => {
+          const item = metadata.find(item => item.Name === name);
+          return item && 'Value' in item ? item.Value : '';
+        };
         
-        if (stkCallback.CallbackMetadata && stkCallback.CallbackMetadata.Item) {
-          const metadata = stkCallback.CallbackMetadata.Item;
-          
-          const receiptItem = metadata.find(item => item.Name === 'MpesaReceiptNumber');
-          if (receiptItem && receiptItem.Value) {
-            mpesaReceiptNumber = receiptItem.Value;
-          }
-          
-          const phoneItem = metadata.find(item => item.Name === 'PhoneNumber');
-          if (phoneItem && phoneItem.Value) {
-            phoneNumber = phoneItem.Value;
-          }
-        }
+        const mpesaReceiptNumber = getMetadataValue('MpesaReceiptNumber');
+        const phoneNumber = getMetadataValue('PhoneNumber');
+        const transactionDate = getMetadataValue('TransactionDate');
+        const paidAmount = getMetadataValue('Amount');
         
         console.log(`M-Pesa receipt number: ${mpesaReceiptNumber}`);
         
-        // Update transaction status and store receipt number
+        // Update transaction status and store receipt number - FIXED string concatenation
         await client.query(
-          'UPDATE transactions SET status = $1, updated_at = NOW(), description = CONCAT(description, \' | Receipt: \', $2) WHERE transaction_id = $3',
-          ['completed', mpesaReceiptNumber, transaction.transaction_id]
+          `UPDATE transactions SET 
+            status = $1, 
+            updated_at = NOW(), 
+            description = description || ' | Receipt: ' || $2
+          WHERE transaction_id = $3`,
+          ['completed', mpesaReceiptNumber || 'N/A', transaction.transaction_id]
         );
         
-        // Try to insert into mpesa_transactions table if it exists (for detailed records)
+        // Update mpesa_transactions record
         try {
           await client.query(
-            `INSERT INTO mpesa_transactions (
-              transaction_id, checkout_request_id, mpesa_receipt_number, 
-              phone_number, transaction_date, result_code, 
-              result_desc, raw_callback, stk_status
-            ) VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8)
-            ON CONFLICT (transaction_id) DO UPDATE SET
-              mpesa_receipt_number = $3,
-              result_code = $5,
-              result_desc = $6,
-              raw_callback = $7,
-              stk_status = $8,
-              transaction_date = NOW()`,
+            `UPDATE mpesa_transactions SET 
+              mpesa_receipt_number = $1,
+              phone_number = $2,
+              transaction_date = $3,
+              result_code = $4,
+              result_desc = $5,
+              raw_callback = $6,
+              stk_status = $7,
+              updated_at = NOW()
+            WHERE transaction_id = $8`,
             [
-              transaction.transaction_id,
-              checkoutRequestId,
-              mpesaReceiptNumber,
-              phoneNumber,
+              mpesaReceiptNumber || '',
+              phoneNumber || '',
+              transactionDate ? new Date(transactionDate) : new Date(),
               resultCode.toString(),
-              stkCallback.ResultDesc,
+              resultMessage,
               JSON.stringify(callbackData),
-              'completed'
+              'completed',
+              transaction.transaction_id
             ]
           );
         } catch (err) {
-          // If the table doesn't exist, just log and continue
-          console.log('Note: mpesa_transactions table may not exist:', err.message);
+          console.log('Error updating mpesa_transactions record:', err.message);
+          // Continue execution - don't throw error, just log it
         }
         
         // Update user balance
@@ -282,52 +309,53 @@ class MpesaService {
           newBalance
         };
       } else {
-        console.log(`Transaction ${checkoutRequestId} failed with code ${resultCode} - ${stkCallback.ResultDesc}`);
+        console.log(`Transaction ${checkoutRequestId} failed with code ${resultCode} - ${resultMessage}`);
         
-        // Update transaction status
+        // Update transaction status - FIXED string concatenation
         await client.query(
-          'UPDATE transactions SET status = $1, updated_at = NOW(), description = CONCAT(description, \' | Failed: \', $2) WHERE transaction_id = $3',
-          ['failed', stkCallback.ResultDesc, transaction.transaction_id]
+          `UPDATE transactions SET 
+            status = $1, 
+            updated_at = NOW(), 
+            description = description || ' | Failed: ' || $2
+          WHERE transaction_id = $3`,
+          ['failed', resultMessage, transaction.transaction_id]
         );
         
-        // Try to update mpesa_transactions table if it exists
+        // Update mpesa_transactions record
         try {
           await client.query(
-            `INSERT INTO mpesa_transactions (
-              transaction_id, checkout_request_id, phone_number, 
-              transaction_date, result_code, result_desc, 
-              raw_callback, stk_status
-            ) VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)
-            ON CONFLICT (transaction_id) DO UPDATE SET
-              result_code = $4,
-              result_desc = $5,
-              raw_callback = $6,
-              stk_status = $7,
-              transaction_date = NOW()`,
+            `UPDATE mpesa_transactions SET 
+              result_code = $1,
+              result_desc = $2,
+              raw_callback = $3,
+              stk_status = $4,
+              updated_at = NOW()
+            WHERE transaction_id = $5`,
             [
-              transaction.transaction_id,
-              checkoutRequestId,
-              '',
               resultCode.toString(),
-              stkCallback.ResultDesc,
+              resultMessage,
               JSON.stringify(callbackData),
-              'failed'
+              'failed',
+              transaction.transaction_id
             ]
           );
         } catch (err) {
-          console.log('Note: mpesa_transactions table may not exist:', err.message);
+          console.log('Error updating mpesa_transactions record:', err.message);
+          // Continue execution - don't throw error, just log it
         }
         
         await client.query('COMMIT');
         
         return { 
           success: false, 
-          message: stkCallback.ResultDesc,
+          message: resultMessage,
           transactionId: transaction.transaction_id
         };
       }
     } catch (error) {
-      await client.query('ROLLBACK');
+      if (client.queryRunning) {
+        await client.query('ROLLBACK').catch(err => console.error('Error rolling back transaction:', err));
+      }
       console.error('Error processing callback:', error);
       throw error;
     } finally {
@@ -345,7 +373,7 @@ class MpesaService {
       // Generate timestamp and password
       const timestamp = moment().format('YYYYMMDDHHmmss');
       const password = this.generatePassword(timestamp);
-  
+
       // Make the API request
       const response = await axios.post(
         `${this.baseUrl}/mpesa/stkpushquery/v1/query`,
@@ -377,6 +405,104 @@ class MpesaService {
       );
     }
   }
+
+async updateTransactionStatusFromQuery(checkoutRequestId, queryResult) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    // Get the current transaction
+    const transactionResult = await client.query(
+      `SELECT 
+        m.transaction_id, 
+        t.user_id, 
+        t.amount,
+        t.status as transaction_status,
+        m.stk_status,
+        m.retry_count
+      FROM mpesa_transactions m
+      JOIN transactions t ON m.transaction_id = t.transaction_id
+      WHERE m.checkout_request_id = $1
+      FOR UPDATE`,
+      [checkoutRequestId]
+    );
+    
+    if (transactionResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      throw new Error('Transaction not found');
+    }
+    
+    const transaction = transactionResult.rows[0];
+    
+    // Increment retry count
+    await client.query(
+      'UPDATE mpesa_transactions SET retry_count = $1, last_query_time = NOW() WHERE transaction_id = $2',
+      [transaction.retry_count + 1, transaction.transaction_id]
+    );
+    
+    // Process the response from M-Pesa
+    const resultCode = queryResult.ResultCode;
+    let newStatus;
+    
+    if (resultCode === '0') {
+      newStatus = 'completed';
+    } else if (resultCode === '1032') {
+      newStatus = 'canceled'; // Transaction canceled by user
+    } else if (resultCode === '2001') {
+      newStatus = 'initiated'; // Still waiting
+    } else if (resultCode === '1037') {
+      newStatus = 'timeout'; // User didn't respond
+    } else {
+      newStatus = 'failed'; // Other failures
+    }
+    
+    // If status has changed, update it
+    if (newStatus !== transaction.stk_status) {
+      // Update mpesa_transactions status
+      await client.query(
+        `UPDATE mpesa_transactions SET 
+          stk_status = $1, 
+          result_code = $2, 
+          result_desc = $3, 
+          updated_at = NOW() 
+        WHERE transaction_id = $4`,
+        [newStatus, resultCode.toString(), queryResult.ResultDesc, transaction.transaction_id]
+      );
+      
+      // If completed or failed, update the main transaction record
+      if (newStatus === 'completed' || ['failed', 'canceled', 'timeout'].includes(newStatus)) {
+        const transactionStatus = newStatus === 'completed' ? 'completed' : 'failed';
+        
+        // Update transaction status - FIXED string concatenation
+        await client.query(
+          `UPDATE transactions SET 
+            status = $1, 
+            updated_at = NOW(),
+            description = description || ' | Status Query: ' || $2
+          WHERE transaction_id = $3`,
+          [transactionStatus, queryResult.ResultDesc, transaction.transaction_id]
+        );
+        
+        // If completed, update user balance (only if not already done)
+        if (newStatus === 'completed' && transaction.transaction_status !== 'completed') {
+          await client.query(
+            'UPDATE users SET balance = balance + $1 WHERE user_id = $2',
+            [transaction.amount, transaction.user_id]
+          );
+        }
+      }
+    }
+    
+    await client.query('COMMIT');
+    return { success: true, status: newStatus };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error updating transaction from query:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
   
   async updateTransactionStatusFromQuery(checkoutRequestId, queryResult) {
     const client = await pool.connect();

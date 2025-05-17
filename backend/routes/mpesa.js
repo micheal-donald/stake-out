@@ -85,30 +85,35 @@ router.post('/callback', async (req, res) => {
     console.log('Callback Headers:', JSON.stringify(req.headers, null, 2));
     console.log('Callback Body:', JSON.stringify(req.body, null, 2));
     
+    // Always respond with 200 OK quickly to the M-Pesa API
+    // This prevents retries that could cause duplicate processing
+    const responsePromise = res.status(200).json({ 
+      success: true,
+      message: "Callback received and processing" 
+    });
+    
     // Validate the callback data structure
     if (!req.body || !req.body.Body) {
       console.error('Invalid callback data received - missing Body');
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid callback data structure' 
-      });
+      return responsePromise;
     }
     
-    // Process the callback
-    const result = await mpesaService.processCallback(req.body);
+    // Process the callback asynchronously
+    // This allows us to return 200 OK to M-Pesa immediately
+    mpesaService.processCallback(req.body)
+      .then(result => {
+        console.log('Callback processing result:', result);
+      })
+      .catch(error => {
+        console.error('Critical error in callback processing:', error);
+      });
     
-    console.log('Callback processing result:', result);
-    
-    // Always return 200 to Safaricom, even on errors
-    // This prevents them from retrying the callback which could lead to duplicate processing
-    res.status(200).json({ 
-      success: true,
-      message: "Callback received and processed" 
-    });
+    // Response already sent
+    return responsePromise;
   } catch (error) {
-    console.error('Critical error in callback processing:', error);
+    console.error('Critical error in callback handler:', error);
     // Still return 200 to prevent retries
-    res.status(200).json({ 
+    return res.status(200).json({ 
       success: false, 
       message: "Callback received but had processing errors" 
     });

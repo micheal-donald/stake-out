@@ -23,6 +23,19 @@ import HistoryList from './components/HistoryList';
 import './style/index.css';
 import './style/StakeOutBet.css';
 
+// Constants for the game
+import {
+  MIN_BET,
+  MAX_BET,
+  DEFAULT_QUICK_AMOUNTS,
+  DEFAULT_AUTO_CASHOUT_MULTIPLIER,
+  DEFAULT_AUTO_CASHOUT_AMOUNT,
+  CURRENCY,
+  GAME_STATES,
+  GAME_MODES,
+  DEFAULT_GAME_MODE
+} from './config/constants';
+
 // Server URL
 const SOCKET_SERVER_URL = 'http://localhost:4000';
 
@@ -242,25 +255,28 @@ const StakeOutBet = () => {
   
   // Place a bet
   const placeBet = () => {
-    if (!socketRef.current || gameState !== 'waiting') {
-      return;
-    }
-    
-    // Clear previous state
+    // only in the pre-round
+    if (!socketRef.current || gameState !== GAME_STATES.WAITING) return;
+
+    // clear previous
     setWinnings(0);
     setError('');
-    
-    // Check balance
-    if (balance < bet) {
-      setError('Insufficient balance');
+
+    // bounds from constants
+    if (bet < MIN_BET || bet > MAX_BET) {
+      setError(`Bet must be between ${MIN_BET} and ${MAX_BET}.`);
       return;
     }
-    
-    // Send bet to server
+
+    if (balance < bet) {
+      setError('Insufficient balance.');
+      return;
+    }
+
     socketRef.current.emit('place_bet', {
       amount: bet,
       autoCashoutAt: autoCashout,
-      autoCashoutAmount: autoCashoutAmount
+      autoCashoutAmount
     });
   };
   
@@ -351,7 +367,7 @@ const StakeOutBet = () => {
     <div className="flex flex-col items-center p-6 bg-gray-900 text-white rounded-lg shadow-lg w-full max-w-2xl">
       <h1 className="text-3xl font-bold mb-6">Stake Out Bet</h1>
       
-      {error && <div className="w-full bg-red-500 text-white p-2 rounded mb-4">{error}</div>}
+      {/* {error && <div className="w-full bg-red-500 text-white p-2 rounded mb-4">{error}</div>} */}
       
       {/* Game Display */}
       <div className="relative w-full h-64 bg-gray-800 rounded-lg mb-6 overflow-hidden">
@@ -383,43 +399,19 @@ const StakeOutBet = () => {
         <div>Balance: ${balance.toFixed(2)}</div>
       </div>
       
-      {/* Controls */}
-      <Controls 
+      {/* ─── Combined Controls + Bet Button ───────────────────────── */}
+        <Controls
         bet={bet}
-        autoCashout={autoCashout}
-        autoCashoutAmount={autoCashoutAmount}
+        multiplier={multiplier}
+        onBetChange={handleBetChange}
+        onQuickSelect={amt => setBet(amt)}
+        onPlaceBet={placeBet}
+        onCashOut={cashOut}
         gameState={gameState}
         hasActiveBet={hasActiveBet}
-        onBetChange={handleBetChange}
-        onAutoCashoutChange={handleAutoCashoutChange}
-        onAutoCashoutAmountChange={handleAutoCashoutAmountChange}
+        mode={DEFAULT_GAME_MODE}
+        errorMessage={error}
       />
-      
-      {/* Action Button */}
-      <div className="w-full mb-6">
-        {!hasActiveBet && gameState === 'waiting' ? (
-          <button 
-            onClick={placeBet}
-            className="w-full py-4 rounded-lg font-bold text-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800"
-          >
-            PLACE BET
-          </button>
-        ) : hasActiveBet && gameState === 'running' ? (
-          <button 
-            onClick={cashOut}
-            className="w-full py-4 rounded-lg font-bold text-xl bg-green-600 hover:bg-green-700 active:bg-green-800"
-          >
-            STAKE OUT! (${(bet * multiplier).toFixed(2)})
-          </button>
-        ) : (
-          <button 
-            disabled
-            className="w-full py-4 rounded-lg font-bold text-xl bg-gray-700 cursor-not-allowed"
-          >
-            {hasActiveBet ? 'Waiting for result...' : 'Waiting for next round...'}
-          </button>
-        )}
-      </div>
       
       {/* History */}
       <HistoryList history={history} />

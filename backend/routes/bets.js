@@ -1,33 +1,25 @@
-const express = require('express');
-const pool = require('../config/db');
+// routes/bets.js
+const express     = require('express');
+const router      = express.Router();
+const pool        = require('../config/db');
+const BetHistory  = require('../models/BetHistory');
 const { authenticateToken } = require('../middlewares/auth');
-const router = express.Router();
 
 // Get Bet History
 router.get('/history', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const page   = parseInt(req.query.page, 10)  || 1;
+    const limit  = parseInt(req.query.limit, 10) || 10;
     const offset = (page - 1) * limit;
-    
-    // Get bet history
-    const result = await pool.query(
-      'SELECT * FROM bet_history WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
-      [userId, limit, offset]
-    );
-    
-    // Get total count for pagination
-    const countResult = await pool.query(
-      'SELECT COUNT(*) FROM bet_history WHERE user_id = $1',
-      [userId]
-    );
-    
-    const totalCount = parseInt(countResult.rows[0].count);
+
+    // Use our model instead of raw SQL here
+    const { bets, totalCount } = await BetHistory.fetchByUser(userId, limit, offset);
+
     const totalPages = Math.ceil(totalCount / limit);
-    
+
     res.json({
-      bets: result.rows,
+      bets,
       pagination: {
         currentPage: page,
         totalPages,
@@ -40,6 +32,7 @@ router.get('/history', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Server error fetching bet history' });
   }
 });
+
 
 // Place a bet
 router.post('/place', authenticateToken, async (req, res) => {

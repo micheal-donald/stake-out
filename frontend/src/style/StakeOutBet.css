@@ -313,3 +313,44 @@ button:disabled {
 .block {
   display: block;
 }
+/* Success button when enabled */
+.btn-success {
+  background-color: #28a745;    /* green */
+  color: #ffffff;               /* white text */
+  border: none;
+}
+
+/* Darker on hover */
+.btn-success:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+/* Even darker on active */
+.btn-success:active:not(:disabled) {
+  background-color: #1e7e34;
+}
+
+/* Pale green when disabled */
+.btn-success:disabled {
+  background-color: #c3e6cb;    /* pale green */
+  color: #6c757d;               /* muted text */
+  cursor: not-allowed;
+}
+/* Error button when enabled */
+/* StakeOutBet.css */
+
+.btn-error {
+  background-color: #dc3545;    /* bootstrap “danger” red */
+  color: #ffffff;               /* white text */
+  border: none;
+}
+
+.btn-error:active {
+  background-color: #c82333;    /* darker red on press */
+}
+
+.btn-error:disabled {
+  background-color: #f5c6cb;    /* pale red when disabled, if needed */
+  color: #721c24;
+  cursor: not-allowed;
+}

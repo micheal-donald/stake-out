@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const pool = require('./config/db');
+const { MIN_BET, MAX_BET } = require('./config/constants');
 
 class GameServer {
   constructor(io) {
@@ -295,74 +296,71 @@ class GameServer {
     }
   }
   
-  async placeBet(userId, amount, autoCashoutAt, autoCashoutAmount) {
+  async placeBet(userId, amount, autoCashoutAt = 0, autoCashoutAmount = 0) {
+    // 1) Round‐state check
     if (this.gameState !== 'waiting') {
       return { success: false, error: 'Betting is closed for this round' };
     }
-    
+
+    // 2) One‐bet‐per‐round check
     if (this.activeBets.has(userId)) {
-      return { success: false, error: 'You already have an active bet for this round' };
+      return { success: false, error: 'You already have an active bet this round' };
     }
-    
-    if (amount <= 0) {
-      return { success: false, error: 'Bet amount must be greater than zero' };
+
+    // 3) Bounds check
+    if (amount < MIN_BET || amount > MAX_BET) {
+      return {
+        success: false,
+        error: `Bet must be between ${MIN_BET} and ${MAX_BET}.`
+      };
     }
-    
+
+    let client;
     try {
-      const client = await pool.connect();
-      
-      try {
-        await client.query('BEGIN');
-        
-        // Check user balance
-        const userResult = await client.query(
-          'SELECT balance FROM users WHERE user_id = $1 FOR UPDATE',
-          [userId]
-        );
-        
-        if (userResult.rows.length === 0) {
-          await client.query('ROLLBACK');
-          return { success: false, error: 'User not found' };
-        }
-        
-        const balance = parseFloat(userResult.rows[0].balance);
-        
-        if (balance < amount) {
-          await client.query('ROLLBACK');
-          return { success: false, error: 'Insufficient balance' };
-        }
-        
-        // Deduct bet amount from balance
-        await client.query(
-          'UPDATE users SET balance = balance - $1 WHERE user_id = $2',
-          [amount, userId]
-        );
-        
-        await client.query('COMMIT');
-        
-        // Add to active bets
-        this.activeBets.set(userId, {
-          amount,
-          autoCashoutAt: autoCashoutAt || 0,
-          autoCashoutAmount: autoCashoutAmount || 0,
-          userId,
-          placedAt: new Date()
-        });
-        
-        return { 
-          success: true, 
-          message: 'Bet placed successfully',
-          balance: balance - amount
-        };
-      } catch (error) {
+      client = await pool.connect();
+      await client.query('BEGIN');
+
+      // 4) Atomic balance deduction: user must exist AND have balance >= amount
+      const { rowCount, rows } = await client.query(
+        `UPDATE users
+          SET balance = balance - $1
+        WHERE user_id = $2
+          AND balance >= $1
+        RETURNING balance`,
+        [amount, userId]
+      );
+
+      if (rowCount === 0) {
+        // either no such user or insufficient funds
         await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
+        return { success: false, error: 'Insufficient balance or user not found' };
       }
-    } catch (error) {
-      console.error('Error placing bet:', error);
+
+      // 5) Commit the deduction
+      await client.query('COMMIT');
+
+      // 6) Register in‐memory active bet
+      this.activeBets.set(userId, {
+        amount,
+        autoCashoutAt,
+        autoCashoutAmount,
+        placedAt: new Date()
+      });
+
+      // 7) Return success + new balance
+      return {
+        success: true,
+        message: 'Bet placed successfully',
+        balance: parseFloat(rows[0].balance)
+      };
+
+    } catch (err) {
+      // any unexpected error → rollback & report
+      if (client) await client.query('ROLLBACK');
+      console.error('Error placing bet:', err);
       return { success: false, error: 'Server error placing bet' };
+    } finally {
+      if (client) client.release();
     }
   }
   

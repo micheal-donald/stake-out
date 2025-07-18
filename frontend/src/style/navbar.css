@@ -1,53 +1,130 @@
-/* Navbar Styles */
+/* Navbar Styles - Gaming Dark Theme */
 
 .navbar {
-  background-color: var(--dark-color);
-  color: var(--light-color);
-  padding: 15px 20px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: var(--space-lg) var(--space-xl);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(8px);
 }
 
 .navbar-brand a {
-  color: var(--light-color);
-  font-size: 24px;
-  font-weight: bold;
+  color: var(--text-primary);
+  font-size: var(--font-2xl);
+  font-weight: 700;
   text-decoration: none;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.navbar-brand a:hover {
+  color: var(--primary-color);
 }
 
 .navbar-menu {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: var(--space-lg);
 }
 
 .navbar-menu a {
-  color: var(--light-color);
+  color: var(--text-primary);
   text-decoration: none;
+  font-weight: 500;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
 }
 
 .navbar-menu a:hover {
-  text-decoration: underline;
+  color: var(--primary-color);
+  background-color: rgba(59, 130, 246, 0.1);
+  text-decoration: none;
 }
 
 .user-balance {
-  background-color: var(--secondary-color);
-  padding: 5px 10px;
-  border-radius: 4px;
-  font-weight: bold;
+  background: linear-gradient(135deg, var(--secondary-color) 0%, #059669 100%);
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-md);
+  font-weight: 600;
   color: white;
+  font-size: var(--font-sm);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .logout-btn {
   background-color: transparent;
-  border: 1px solid white;
-  color: white;
-  padding: 5px 10px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  font-weight: 500;
+  font-size: var(--font-sm);
+  cursor: pointer;
 }
 
 .logout-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--danger-color);
+  border-color: var(--danger-color);
+  color: white;
+  transform: translateY(-1px);
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .navbar {
+    padding: var(--space-md) var(--space-lg);
+  }
+  
+  .navbar-brand a {
+    font-size: var(--font-xl);
+  }
+  
+  .navbar-menu {
+    gap: var(--space-md);
+  }
+  
+  .navbar-menu a {
+    font-size: var(--font-sm);
+    padding: var(--space-xs);
+  }
+  
+  .user-balance {
+    font-size: var(--font-xs);
+    padding: var(--space-xs);
+  }
+  
+  .logout-btn {
+    font-size: var(--font-xs);
+    padding: var(--space-xs);
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+  
+  .navbar-menu {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--border-color);
+  }
 }

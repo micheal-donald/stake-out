@@ -19,6 +19,7 @@ import MultiplierDisplay from './components/MultiplierDisplay';
 import Controls from './components/Controls';
 import ActionButton from './components/ActionButton';
 import HistoryList from './components/HistoryList';
+import LiveBetsComponent from './components/LiveBetsComponent';
 
 import './style/index.css';
 import './style/StakeOutBet.css';
@@ -364,82 +365,72 @@ const StakeOutBet = () => {
   };
   
   return (
-    <div className="flex flex-col items-center p-6 bg-gray-900 text-white rounded-lg shadow-lg w-full max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6">Stake Out Bet</h1>
-      
-      {/* {error && <div className="w-full bg-red-500 text-white p-2 rounded mb-4">{error}</div>} */}
-      
-      {/* Game Display */}
-      <div className="relative w-full h-64 bg-gray-800 rounded-lg mb-6 overflow-hidden">
-        {/* Game graph */}
-        {gameState === 'running' && (
-          <GameGraph 
-            multiplier={multiplier}
-            dangerLevel={dangerLevel}
-            getDynamicColor={getDynamicColor}
-          />
-        )}
-        
-        {/* Multiplier Display */}
-        {gameState === 'running' && (
-          <MultiplierDisplay 
-            multiplier={multiplier}
-            dangerLevel={dangerLevel}
-          />
-        )}
-        
-        {/* Game States Message */}
-        {renderGameStateMessage()}
-      </div>
-      
-      {/* Game Info */}
-      <div className="w-full mb-4 flex justify-between text-sm">
-        <div>Game #{gameId || '—'}</div>
-        <div>Active Players: {activePlayers}</div>
-        <div>Balance: ${balance.toFixed(2)}</div>
-      </div>
-      
-      {/* ─── Combined Controls + Bet Button ───────────────────────── */}
-        <Controls
-        bet={bet}
-        multiplier={multiplier}
-        onBetChange={handleBetChange}
-        onQuickSelect={amt => setBet(amt)}
-        onPlaceBet={placeBet}
-        onCashOut={cashOut}
-        gameState={gameState}
-        hasActiveBet={hasActiveBet}
-        mode={DEFAULT_GAME_MODE}
-        errorMessage={error}
-      />
-      
-      {/* History */}
-      <HistoryList history={history} />
-      
-      {/* Provable Fairness Info */}
-      {/* <div className="w-full mt-4 p-4 bg-gray-800 rounded text-xs">
-        <div className="flex items-center mb-2">
-          <InfoIcon size={16} className="mr-1" />
-          <h3 className="font-bold">Provable Fairness</h3>
-        </div>
-        <div className="mb-1">
-          <span className="font-semibold">Current Game Hash:</span> {currentGameHash ? currentGameHash.substring(0, 20) + '...' : 'N/A'}
-        </div>
-        {previousGameSeed && (
-          <div className="mb-1">
-            <span className="font-semibold">Previous Game Seed:</span> {previousGameSeed.substring(0, 20) + '...'}
+    <div className="game-container">
+      {/* Main Game Area - 70% of screen */}
+      <div className="game-area">
+        <div className="card h-full">
+          <h1 className="text-3xl font-bold mb-lg text-center">Stake Out Bet</h1>
+          
+          {/* Game Display */}
+          <div className="game-canvas mb-lg">
+            {/* Game graph */}
+            {gameState === 'running' && (
+              <GameGraph 
+                multiplier={multiplier}
+                dangerLevel={dangerLevel}
+                getDynamicColor={getDynamicColor}
+              />
+            )}
+            
+            {/* Multiplier Display */}
+            {gameState === 'running' && (
+              <MultiplierDisplay 
+                multiplier={multiplier}
+                dangerLevel={dangerLevel}
+              />
+            )}
+            
+            {/* Game States Message */}
+            {renderGameStateMessage()}
           </div>
-        )}
-        {previousGameHash && (
-          <div>
-            <span className="font-semibold">Previous Game Hash:</span> {previousGameHash.substring(0, 20) + '...'}
+          
+          {/* Game Info */}
+          <div className="flex justify-between text-sm mb-md">
+            <div>Game #{gameId || '—'}</div>
+            <div>Active Players: {activePlayers}</div>
+            <div>Balance: ${balance.toFixed(2)}</div>
           </div>
-        )}
-      </div> */}
+          
+          {/* Controls */}
+          <div className="controls-container">
+            <Controls
+              bet={bet}
+              multiplier={multiplier}
+              onBetChange={handleBetChange}
+              onQuickSelect={amt => setBet(amt)}
+              onPlaceBet={placeBet}
+              onCashOut={cashOut}
+              gameState={gameState}
+              hasActiveBet={hasActiveBet}
+              mode={DEFAULT_GAME_MODE}
+              errorMessage={error}
+            />
+          </div>
+          
+          {/* History */}
+          <div className="mt-xl">
+            <HistoryList history={history} />
+          </div>
+        </div>
+      </div>
 
-      {/* Stats and Help */}
-      <div className="w-full mt-6 text-xs text-gray-400">
-        <p>Press STAKE OUT to cash out before the multiplier crashes!</p>
+      {/* Live Bets Sidebar - 30% of screen */}
+      <div className="community-area">
+        <LiveBetsComponent 
+          gameState={gameState}
+          activePlayers={activePlayers}
+          socketRef={socketRef}
+        />
       </div>
     </div>
   );

@@ -60,6 +60,14 @@ module.exports = function setupSocketHandlers(io, gameServer) {
             autoCashoutAmount
           }
         });
+
+        // Broadcast new bet to all connected clients for live betting feed
+        io.emit('live_bet_placed', {
+          username: authenticatedUser.username,
+          amount: amount,
+          autoCashout: autoCashoutAt > 0 ? autoCashoutAt : null,
+          timestamp: Date.now()
+        });
       } else {
         socket.emit('bet_error', result.error);
       }
@@ -81,6 +89,16 @@ module.exports = function setupSocketHandlers(io, gameServer) {
       // Successful cashouts are handled in the game server and emitted there
     });
     
+    // Get current active bets for live feed
+    socket.on('get_live_bets', () => {
+      const activeBets = gameServer.getActiveBetsForFeed();
+      socket.emit('live_bets_update', {
+        bets: activeBets,
+        totalStaked: activeBets.reduce((sum, bet) => sum + bet.amount, 0),
+        activePlayers: activeBets.length
+      });
+    });
+
     // Request game history
     socket.on('get_game_history', async (limit = 10) => {
       try {

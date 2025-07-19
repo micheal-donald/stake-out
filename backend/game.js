@@ -96,7 +96,7 @@ class GameServer {
   
   startCountdown() {
     this.gameState = 'waiting';
-    this.countdown = 5;
+    this.countdown = 7;
     this.multiplier = 1.00;
     this.activeBets = new Map();
     
@@ -571,6 +571,27 @@ class GameServer {
   // Get the active bet for a user
   getActiveBet(userId) {
     return this.activeBets.get(userId) || null;
+  }
+
+  // Get active bets for live feed (with privacy protection)
+  getActiveBetsForFeed() {
+    const bets = [];
+    for (const [userId, bet] of this.activeBets.entries()) {
+      // Get username from database or use masked ID
+      // For now, we'll use a masked user ID
+      const maskedUsername = `Player${userId.toString().slice(-3)}`;
+      
+      bets.push({
+        id: `bet_${userId}_${Date.now()}`,
+        username: maskedUsername,
+        amount: bet.amount,
+        autoCashout: bet.autoCashoutAt > 0 ? bet.autoCashoutAt : null,
+        timestamp: bet.placedAt.getTime()
+      });
+    }
+    
+    // Sort by most recent first
+    return bets.sort((a, b) => b.timestamp - a.timestamp);
   }
 }
 

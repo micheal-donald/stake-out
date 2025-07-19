@@ -1,1 +1,7 @@
-pesrist balances to database
+Authoritative enforcement—never trust the client. The server must re-check every rule before accepting a bet.
+
+Security & fairness—ensure users can’t bypass limits, manipulate their own state, or place bets mid-round by hacking the front end.
+
+Balance management—deduct the stake or reserve funds in your database.
+
+Game logic—record the bet, tie it to the game round, evaluate cash-outs, and determine win/loss when the crash occurs.

@@ -22,7 +22,7 @@ const BetHistoryComponent = () => {
           throw new Error('Not authenticated');
         }
         
-        const res = await axios.get(`http://localhost:4000/api/bet-history?page=${pagination.currentPage}&limit=10`, {
+        const res = await axios.get(`http://localhost:4000/api/bet/history?page=${pagination.currentPage}&limit=10`, {
           headers: {
             Authorization: `Bearer ${token}`
           }

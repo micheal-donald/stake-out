@@ -46,7 +46,6 @@ logs/
 *.pgsql
 *.dump
 dbdata/*
-dbdata/
 
 # Optional: ignore database or backup files
 *.sqlite
@@ -57,3 +56,4 @@ dbdata/
 *.env.development.local
 *.env.test.local
 *.env.production.local
+dbdata/

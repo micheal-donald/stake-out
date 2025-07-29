@@ -65,9 +65,9 @@ const MultiplierDisplay = ({ multiplier, dangerLevel }) => {
         dangerLevel === 'extreme' ? 'animate-pulse' : ''
       }`}
       style={{
-        top: '10px',
+        top: '50%',
         left: '50%',
-        transform: `translateX(-50%) translate(${shake.x}px, ${shake.y}px)`,
+        transform: `translate(-50%, -50%) translate(${shake.x}px, ${shake.y}px)`,
         fontSize: `${fontSize}px`,
         color: dynamicColor,
         textShadow: glowEffect,

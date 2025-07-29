@@ -31,30 +31,12 @@ const Controls = ({
   // Helpers for current state
   const isWaiting = gameState === GAME_STATES.WAITING;
   const isRunning = gameState === GAME_STATES.RUNNING;
+  const isEnded = gameState === GAME_STATES.ENDED || gameState === 'crashed';
 
-  // determine if we're in cash-out state
-  const isCashOutMode = hasActiveBet && gameState === GAME_STATES.RUNNING;
-
-  // unified disabled flag
-  const buttonDisabled = !(
-    (!hasActiveBet && gameState === GAME_STATES.WAITING) ||
-    isCashOutMode
-  );
-
-  // pick the click handler
-  const buttonOnClick = isCashOutMode
-    ? onCashOut
-    : () => onPlaceBet(bet);
-
-  // pick the CSS classes
-  const buttonClass = isCashOutMode
-    ? 'btn-error'
-    : 'bg-green-500 text-white hover:bg-green-600 active:bg-green-700';
-
-  // pick the label
-  const buttonLabel = isCashOutMode
-    ? `CASH OUT\n${(bet * multiplier).toFixed(2)} KES`
-    : `Bet\n${bet.toFixed(2)} KES`;
+  // Button states
+  const canPlaceBet = !hasActiveBet && isWaiting;
+  const canCashOut = hasActiveBet && isRunning;
+  const showCashOutButton = hasActiveBet;
 
   // Quick amount buttons matching the design
   const quickAmounts = [100, 200, 500, 10000];
@@ -99,8 +81,7 @@ const Controls = ({
             <div className="flex items-center">
               <button
                 onClick={() => onBetChange({ target: { value: Math.max(10, bet - 10) } })}
-                disabled={!isWaiting || hasActiveBet}
-                className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600"
               >
                 <Minus size={16} className="text-white" />
               </button>
@@ -111,48 +92,136 @@ const Controls = ({
 
               <button
                 onClick={() => onBetChange({ target: { value: bet + 10 } })}
-                disabled={!isWaiting || hasActiveBet}
-                className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600"
               >
                 <Plus size={16} className="text-white" />
               </button>
             </div>
           </div>
 
-          {/* ─ Grid and Bet Button Row ─────────────────────────────── */}
-          <div className="flex items-stretch mb-6">
-            {/* Left: Quick Amount Grid */}
-            <div className="grid grid-cols-2 gap-2 w-40 h-20">
-              {quickAmounts.map(amount => (
-                <button
-                  key={amount}
-                  onClick={() => onQuickSelect(amount)}
-                  disabled={!isWaiting || hasActiveBet}
-                  className="bg-gray-700 rounded-lg text-white text-sm font-medium hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {amount.toLocaleString()}
-                </button>
-              ))}
+          {/* ─ Two Column Layout ─────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-8 mb-6">
+            {/* Column 1: Amount Controls and Quick Grid */}
+            <div className="space-y-6">
+              {/* Quick Amount Grid */}
+              <div className="flex justify-center">
+                <div className="grid grid-cols-2 gap-2 w-40 h-20">
+                  {quickAmounts.map(amount => (
+                    <button
+                      key={amount}
+                      onClick={() => onQuickSelect(amount)}
+                      disabled={!canPlaceBet}
+                      className="bg-gray-700 rounded-lg text-white text-sm font-medium hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {amount.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Fixed width spacer */}
-            <div className="w-8"></div>
+            {/* Column 2: Bet and Cash Out Buttons */}
+            <div className="flex flex-col items-center justify-center gap-3">
+              {/* Bet Button - Shows when no active bet */}
+              {!hasActiveBet && (
+                <button
+                  onClick={() => onPlaceBet(bet)}
+                  disabled={!canPlaceBet}
+                  style={{
+                    height: '48px',
+                    padding: '0 32px',
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                    borderRadius: '12px',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '160px',
+                    transition: 'all 0.2s ease',
+                    backgroundColor: canPlaceBet ? '#10b981' : '#6b7280',
+                    color: 'white',
+                    border: 'none',
+                    cursor: canPlaceBet ? 'pointer' : 'not-allowed',
+                    opacity: canPlaceBet ? 1 : 0.5,
+                    boxShadow: canPlaceBet ? '0 4px 6px rgba(0, 0, 0, 0.1)' : 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    if (canPlaceBet) e.target.style.backgroundColor = '#059669';
+                  }}
+                  onMouseOut={(e) => {
+                    if (canPlaceBet) e.target.style.backgroundColor = '#10b981';
+                  }}
+                >
+                  Bet {bet.toFixed(2)} KES
+                </button>
+              )}
 
-            {/* Middle: Flexible spacer */}
-            <div className="flex-1"></div>
+              {/* Cash Out Button - Shows when user has active bet */}
+              {showCashOutButton && (
+                <button
+                  onClick={onCashOut}
+                  disabled={!canCashOut}
+                  style={{
+                    height: '48px',
+                    padding: '0 32px',
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                    borderRadius: '12px',
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: '160px',
+                    transition: 'all 0.2s ease',
+                    backgroundColor: canCashOut ? '#ef4444' : '#6b7280',
+                    color: 'white',
+                    border: 'none',
+                    cursor: canCashOut ? 'pointer' : 'not-allowed',
+                    opacity: canCashOut ? 1 : 0.5,
+                    boxShadow: canCashOut ? '0 4px 6px rgba(0, 0, 0, 0.1)' : 'none',
+                    animation: canCashOut ? 'pulse 2s infinite' : 'none'
+                  }}
+                  onMouseOver={(e) => {
+                    if (canCashOut) e.target.style.backgroundColor = '#dc2626';
+                  }}
+                  onMouseOut={(e) => {
+                    if (canCashOut) e.target.style.backgroundColor = '#ef4444';
+                  }}
+                >
+                  {canCashOut 
+                    ? `Cash Out ${(bet * multiplier).toFixed(2)} KES`
+                    : isEnded
+                      ? `Round Ended - ${(bet * multiplier).toFixed(2)} KES`
+                      : `Waiting...`
+                  }
+                </button>
+              )}
 
-            {/* Right: Large Bet Button */}
-            <button
-              onClick={buttonOnClick}
-              disabled={buttonDisabled}
-              className={`
-                h-20 px-8 font-bold text-lg rounded-xl whitespace-pre-line leading-tight flex items-center justify-center
-                ${buttonClass}
-                ${buttonDisabled ? 'opacity-50 cursor-not-allowed' : ''}
-              `}
-            >
-              {buttonLabel}
-            </button>
+              {/* Status Indicator */}
+              {hasActiveBet && (
+                <div className="text-sm text-gray-400 mt-2">
+                  {isRunning && (
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                      Game Running - Multiplier: {multiplier.toFixed(2)}x
+                    </span>
+                  )}
+                  {isWaiting && (
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                      Waiting for round to start...
+                    </span>
+                  )}
+                  {isEnded && (
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
+                      Round ended
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

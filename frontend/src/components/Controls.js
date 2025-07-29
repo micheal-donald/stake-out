@@ -40,6 +40,9 @@ const Controls = ({
   const showBetButton = !hasActiveBet;
   const showCashOutButton = hasActiveBet;
 
+  // Display amount should reflect the actual placed bet when active
+  const displayBetAmount = hasActiveBet ? currentBetAmount : bet;
+
   // Quick amount buttons matching the design
   const quickAmounts = [100, 200, 500, 10000];
 
@@ -89,7 +92,7 @@ const Controls = ({
               </button>
 
               <div className="mx-6 text-center">
-                <div className="text-2xl font-bold text-white">{bet.toFixed(2)}</div>
+                <div className="text-2xl font-bold text-white">{displayBetAmount.toFixed(2)}</div>
               </div>
 
               <button
@@ -191,10 +194,10 @@ const Controls = ({
                     if (canCashOut) e.target.style.backgroundColor = '#ef4444';
                   }}
                 >
-                  {canCashOut 
-                    ? `Cash Out ${(bet * multiplier).toFixed(2)} KES`
+                  {canCashOut
+                    ? `Cash Out ${(displayBetAmount * multiplier).toFixed(2)} KES`
                     : isEnded
-                      ? `Round Ended - ${(bet * multiplier).toFixed(2)} KES`
+                      ? `Round Ended - ${(displayBetAmount * multiplier).toFixed(2)} KES`
                       : `Waiting...`
                   }
                 </button>

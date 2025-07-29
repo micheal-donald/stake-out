@@ -225,6 +225,13 @@ class GameServer {
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [userId, this.gameId, bet.amount, 0, this.crashPoint, 0, 'none']
           );
+          
+          // Notify the user that they lost their bet
+          this.io.to(`user-${userId}`).emit('game_lost', {
+            gameId: this.gameId,
+            betAmount: bet.amount,
+            crashPoint: this.crashPoint
+          });
         }
         
         // Update game record to completed
@@ -238,6 +245,9 @@ class GameServer {
         );
         
         await client.query('COMMIT');
+        
+        // Clear all active bets after processing
+        this.activeBets.clear();
       } catch (error) {
         await client.query('ROLLBACK');
         throw error;

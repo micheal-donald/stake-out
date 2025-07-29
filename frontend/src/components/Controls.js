@@ -36,6 +36,7 @@ const Controls = ({
   // Button states
   const canPlaceBet = !hasActiveBet && isWaiting;
   const canCashOut = hasActiveBet && isRunning;
+  const showBetButton = !hasActiveBet;
   const showCashOutButton = hasActiveBet;
 
   // Quick amount buttons matching the design

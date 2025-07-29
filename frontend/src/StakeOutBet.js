@@ -128,6 +128,16 @@ const StakeOutBet = () => {
         setBalance(parseFloat(userData.balance) || 0);
       });
       
+      // Handle active bet notification
+      socketRef.current.on('active_bet', (betData) => {
+        if (betData) {
+          setHasActiveBet(true);
+          setBet(betData.amount);
+          setAutoCashout(betData.autoCashoutAt || 0);
+          setAutoCashoutAmount(betData.autoCashoutAmount || 0);
+        }
+      });
+      
       // Handle authentication error
       socketRef.current.on('authentication_error', (error) => {
         console.error('Authentication error:', error);

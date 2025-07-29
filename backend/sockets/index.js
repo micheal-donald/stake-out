@@ -1,3 +1,4 @@
+// backend/sockets/index.js - Updated version with better active bet handling
 const pool = require('../config/db');
 const { authenticateSocketToken } = require('../middlewares/socketAuth');
 
@@ -26,10 +27,11 @@ module.exports = function setupSocketHandlers(io, gameServer) {
           balance: user.balance
         });
         
-        // If the user already has an active bet in the current game, send it
+        // IMPORTANT: Check and send active bet status
         if (gameServer.hasActiveBet(user.userId)) {
           const activeBet = gameServer.getActiveBet(user.userId);
           socket.emit('active_bet', activeBet);
+          console.log(`User ${user.userId} has active bet:`, activeBet);
         }
         
         console.log(`User ${user.userId} authenticated on socket ${socket.id}`);

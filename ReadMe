@@ -1,3 +1,39 @@
+Repository Overview
+
+Stake Out Bet is a full‑stack gambling application consisting of a Node.js/Express backend, a React frontend and a PostgreSQL database. Real‑time interaction is provided via Socket.IO. The project’s structure is documented in CLAUDE.md.
+
+Backend
+Entry point: backend/server.js sets up Express routes, initializes Socket.IO, and starts the game server.
+
+Game engine: backend/game.js handles round generation, betting, cashouts and broadcasting state via Socket.IO. It stores crash points in the database and manages active bets with in-memory maps.
+
+Routes: Authentication, profile, settings, betting, game history, wallet, and M-Pesa payment endpoints are under backend/routes/ (e.g. auth.js, wallet.js, mpesa.js).
+
+Database: Connection via backend/config/db.js with PostgreSQL. Schema defined in database/init.sql includes tables such as users, game_rounds, bet_history, transactions, and mpesa_transactions.
+
+Socket handlers: backend/sockets/index.js authenticates sockets, forwards bet/cashout events to the game server, and provides history lookups.
+
+Mpesa integration: backend/services/mpesa.js handles STK push initiation, callbacks, and transaction queries via M-Pesa APIs.
+
+Frontend
+Main component: src/StakeOutBet.js connects to the backend via Socket.IO, renders the multiplier graph and controls, and handles placing bets and cashing out.
+
+Auth: src/AuthContext.jsx stores authentication state and exposes login/logout helpers for API calls.
+
+Components: UI pieces in src/components/ include the game controls, history list, live bets sidebar, profile, wallet, etc. Example: Controls.js manages bet input and cashout button states.
+
+Constants and utilities: Game settings and helper functions are under src/config/constants.js and src/utils/gameHelpers.js.
+
+Database & Deployment
+Docker compose provides a Postgres container, Adminer, and ngrok for tunneling HTTP traffic.
+
+start.sh is a comprehensive script to set up dependencies, run migrations, start services and manage environment variables.
+
+Documentation
+documentation/Wallet.md explains the wallet module: balance, deposits, withdrawals and transaction history.
+
+Overall, the repository contains a complete crash-gambling game with user authentication, wallet management (including M-Pesa payment integration), and a real-time game engine with provable fairness. The frontend offers components for gameplay, profiles, bet histories and wallet management, while the backend exposes REST APIs and WebSocket events for all core functionality.
+
 # Start the database
 
 sudo docker compose up

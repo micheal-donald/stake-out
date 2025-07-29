@@ -351,6 +351,17 @@ const GameGraph = ({ multiplier, dangerLevel, getDynamicColor }) => {
         r={dangerLevel === 'extreme' ? 1.2 : dangerLevel === 'risky' ? 1 : 0.8}
         fill={dynamicColor}
       />
+
+      {/* Multiplier label near the latest point */}
+      <text
+        x={Math.min(lastPoint.cx + 2, 95)}
+        y={Math.max(lastPoint.cy - 2, 5)}
+        fill={dynamicColor}
+        fontSize="4"
+        fontWeight="bold"
+      >
+        {multiplier.toFixed(2)}x
+      </text>
     </svg>
   );
 };

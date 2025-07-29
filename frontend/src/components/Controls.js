@@ -17,7 +17,8 @@ const Controls = ({
   gameState,
   hasActiveBet,
   mode = GAME_MODES.MANUAL,
-  errorMessage
+  errorMessage,
+  currentBetAmount = 0 // The actual bet amount placed
 }) => {
   const [activeTab, setActiveTab] = useState('Bet');
   

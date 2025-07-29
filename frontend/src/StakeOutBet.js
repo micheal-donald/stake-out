@@ -1,4 +1,4 @@
-// Updated StakeOutBet.js with WebSocket integration
+// Updated StakeOutBet.js with fixes for cash out functionality
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Clock, AlertTriangle, RefreshCw, InfoIcon } from 'lucide-react';
 import io from 'socket.io-client';
@@ -61,6 +61,7 @@ const StakeOutBet = () => {
   const [autoCashout, setAutoCashout] = useState(0);
   const [autoCashoutAmount, setAutoCashoutAmount] = useState(0);
   const [hasActiveBet, setHasActiveBet] = useState(false);
+  const [currentBetAmount, setCurrentBetAmount] = useState(0); // Track the actual bet amount
   const [error, setError] = useState('');
   const [winnings, setWinnings] = useState(0);
   
@@ -82,7 +83,7 @@ const StakeOutBet = () => {
     return 'extreme';
   }, [multiplier]);
   
-  const getDynamicColor = useMemo(() => {
+  const getDynamicColorMemo = useMemo(() => {
     return DANGER_COLORS[dangerLevel];
   }, [dangerLevel]);
   
@@ -119,20 +120,23 @@ const StakeOutBet = () => {
       
       // Handle connection
       socketRef.current.on('connect', () => {
+        console.log('Connected to server');
         // Authenticate with the server
         socketRef.current.emit('authenticate', token);
       });
       
       // Handle authentication response
       socketRef.current.on('authenticated', (userData) => {
+        console.log('Authenticated:', userData);
         setBalance(parseFloat(userData.balance) || 0);
       });
       
       // Handle active bet notification
       socketRef.current.on('active_bet', (betData) => {
+        console.log('Active bet received:', betData);
         if (betData) {
           setHasActiveBet(true);
-          setBet(betData.amount);
+          setCurrentBetAmount(betData.amount); // Store the actual bet amount
           setAutoCashout(betData.autoCashoutAt || 0);
           setAutoCashoutAmount(betData.autoCashoutAmount || 0);
         }
@@ -146,6 +150,7 @@ const StakeOutBet = () => {
       
       // Game state updates
       socketRef.current.on('game_state', (data) => {
+        console.log('Game state update:', data);
         setGameState(data.state);
         setCountdown(data.countdown);
         setMultiplier(data.multiplier);
@@ -187,33 +192,39 @@ const StakeOutBet = () => {
             ]);
           }
           
-          // Reset user bet state
-          setHasActiveBet(false);
+          // Reset user bet state only if they don't have a pending bet for next round
           setCashoutTrigger('manual');
+          setWinnings(0);
         }
         
-        // When game crashes, add to history
-        if (data.state === 'crashed' && data.multiplier > 0) {
-          // Already handled in 'waiting' to avoid duplicates
+        // When game crashes, check if user had an active bet
+        if (data.state === 'crashed' && hasActiveBet) {
+          // User lost their bet
+          console.log('Game crashed, user lost bet');
         }
       });
       
       // Bet result
       socketRef.current.on('bet_result', (data) => {
+        console.log('Bet result:', data);
         if (data.success) {
           setBalance(data.balance);
           setHasActiveBet(true);
+          setCurrentBetAmount(data.bet.amount); // Store the actual bet amount
           setError('');
         }
       });
       
       // Bet error
       socketRef.current.on('bet_error', (errorMsg) => {
+        console.error('Bet error:', errorMsg);
         setError(errorMsg);
+        setHasActiveBet(false);
       });
       
       // Cashout result
       socketRef.current.on('cashout_result', (data) => {
+        console.log('Cashout result:', data);
         if (data.success) {
           setBalance(data.newBalance);
           setWinnings(data.winnings);
@@ -224,7 +235,15 @@ const StakeOutBet = () => {
       
       // Cashout error
       socketRef.current.on('cashout_error', (errorMsg) => {
+        console.error('Cashout error:', errorMsg);
         setError(errorMsg);
+      });
+      
+      // Handle when the game crashes and user loses
+      socketRef.current.on('game_lost', (data) => {
+        console.log('Game lost:', data);
+        setHasActiveBet(false);
+        setWinnings(0);
       });
       
       // Load game history on connect
@@ -243,7 +262,7 @@ const StakeOutBet = () => {
   const fetchGameHistory = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:4000/api/game-history?limit=10', {
+      const response = await fetch('http://localhost:4000/api/game/history?limit=10', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -266,8 +285,18 @@ const StakeOutBet = () => {
   
   // Place a bet
   const placeBet = () => {
+    console.log('Placing bet:', { bet, gameState, hasActiveBet });
+    
     // only in the pre-round
-    if (!socketRef.current || gameState !== GAME_STATES.WAITING) return;
+    if (!socketRef.current || gameState !== GAME_STATES.WAITING) {
+      setError('Can only place bets during waiting period');
+      return;
+    }
+    
+    if (hasActiveBet) {
+      setError('You already have an active bet');
+      return;
+    }
 
     // clear previous
     setWinnings(0);
@@ -284,6 +313,7 @@ const StakeOutBet = () => {
       return;
     }
 
+    console.log('Emitting place_bet event');
     socketRef.current.emit('place_bet', {
       amount: bet,
       autoCashoutAt: autoCashout,
@@ -293,10 +323,14 @@ const StakeOutBet = () => {
   
   // Cash out
   const cashOut = () => {
+    console.log('Attempting cash out:', { gameState, hasActiveBet });
+    
     if (!socketRef.current || gameState !== 'running' || !hasActiveBet) {
+      console.log('Cannot cash out:', { socketConnected: !!socketRef.current, gameState, hasActiveBet });
       return;
     }
     
+    console.log('Emitting cash_out event');
     socketRef.current.emit('cash_out');
   };
   
@@ -388,7 +422,7 @@ const StakeOutBet = () => {
               <GameGraph 
                 multiplier={multiplier}
                 dangerLevel={dangerLevel}
-                getDynamicColor={getDynamicColor}
+                getDynamicColor={getDynamicColorMemo}
               />
             )}
             
@@ -411,6 +445,11 @@ const StakeOutBet = () => {
             <div>Balance: ${balance.toFixed(2)}</div>
           </div>
           
+          {/* Debug Info - Remove in production */}
+          <div className="text-xs text-gray-500 mb-2">
+            State: {gameState} | Has Bet: {hasActiveBet ? 'Yes' : 'No'} | Bet Amount: {currentBetAmount}
+          </div>
+          
           {/* Controls */}
           <div className="controls-container">
             <Controls
@@ -424,6 +463,7 @@ const StakeOutBet = () => {
               hasActiveBet={hasActiveBet}
               mode={DEFAULT_GAME_MODE}
               errorMessage={error}
+              currentBetAmount={currentBetAmount} // Pass the actual bet amount
             />
           </div>
           

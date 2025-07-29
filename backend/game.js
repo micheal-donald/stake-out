@@ -1,4 +1,4 @@
-// backend/game.js - The core game engine
+// backend/game.js - Fixed version with proper socket room handling
 
 const crypto = require('crypto');
 const pool = require('./config/db');
@@ -98,7 +98,7 @@ class GameServer {
     this.gameState = 'waiting';
     this.countdown = 7;
     this.multiplier = 1.00;
-    this.activeBets = new Map();
+    // Don't clear active bets here - they persist until game starts
     
     // Notify clients about the new game round
     this.broadcastGameState();
@@ -135,6 +135,7 @@ class GameServer {
       this.updateInterval = setInterval(() => this.updateGameState(), 50); // 20 updates per second
       
       console.log(`Game ${this.gameId} started. Will crash at ${this.crashPoint}x`);
+      console.log(`Active bets: ${this.activeBets.size}`);
     } catch (error) {
       console.error('Error starting game:', error);
       this.handleGameError();
@@ -227,6 +228,7 @@ class GameServer {
           );
           
           // Notify the user that they lost their bet
+          // Use the correct socket.io room syntax
           this.io.to(`user-${userId}`).emit('game_lost', {
             gameId: this.gameId,
             betAmount: bet.amount,

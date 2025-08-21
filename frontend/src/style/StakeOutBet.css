@@ -1,36 +1,81 @@
 /* StakeOutBet Game Specific Styles */
 /* Note: Base styles moved to index.css */
 
-/* Game Layout Specific Utilities */
+/* Mobile-First Game Layout */
 .game-container {
   display: flex;
+  flex-direction: column;
   width: 100%;
   min-height: 100vh;
   background-color: var(--bg-primary);
+  position: relative;
+  padding-bottom: 100px; /* Space for fixed bottom actions */
 }
 
 .game-area {
-  width: 70%;
-  padding: var(--space-lg);
-}
-
-.community-area {
-  width: 30%;
-  background-color: var(--bg-secondary);
-  border-left: 1px solid var(--border-color);
-  padding: var(--space-lg);
+  width: 100%;
+  padding: var(--space-md);
+  flex: 1;
   display: flex;
   flex-direction: column;
 }
 
+.community-area {
+  width: 100%;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  padding: var(--space-md);
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Desktop Layout (Progressive Enhancement) */
+@media (min-width: 1024px) {
+  .game-container {
+    flex-direction: row;
+    padding-bottom: 0;
+  }
+  
+  .game-area {
+    width: 70%;
+    padding: var(--space-lg);
+  }
+  
+  .community-area {
+    width: 30%;
+    background-color: var(--bg-secondary);
+    border-left: 1px solid var(--border-color);
+    border-top: none;
+    padding: var(--space-lg);
+    max-height: none;
+  }
+}
+
 .game-canvas {
   width: 100%;
-  height: 400px;
+  height: 250px; /* Reduced height for mobile */
   background-color: var(--bg-primary);
   border-radius: var(--radius-lg);
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   position: relative;
   overflow: hidden;
+  margin-bottom: var(--space-md);
+}
+
+/* Larger canvas on tablets and desktop */
+@media (min-width: 768px) {
+  .game-canvas {
+    height: 350px;
+    border: 2px solid var(--border-color);
+  }
+}
+
+@media (min-width: 1024px) {
+  .game-canvas {
+    height: 400px;
+  }
 }
 
 .game-area .card {
@@ -51,46 +96,84 @@
   border: 1px solid var(--border-color);
 }
 
-/* Game Specific Typography */
+/* Mobile-First Neon Pulse Multiplier Display */
 .multiplier-display {
-  font-size: var(--font-4xl);
-  font-weight: 700;
-  color: var(--accent-green);
-  text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
-  animation: pulse-glow 2s ease-in-out infinite alternate;
+  font-size: clamp(2.5rem, 8vw, 4rem); /* Responsive scaling for mobile */
+  font-weight: 800;
+  color: var(--primary-color);
+  text-shadow: var(--glow-primary);
+  animation: neon-pulse 2s ease-in-out infinite;
+  text-align: center;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-family: 'Inter', sans-serif;
+  font-feature-settings: 'tnum'; /* Tabular numbers for consistent width */
 }
 
 .crashed-multiplier {
   color: var(--accent-red);
-  text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+  text-shadow: var(--glow-danger);
+  animation: danger-pulse 1s ease-in-out infinite;
 }
 
-@keyframes pulse-glow {
-  from {
-    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+.multiplier-container {
+  position: relative;
+  margin: var(--space-lg) 0;
+  padding: var(--space-lg);
+  background: radial-gradient(circle, rgba(0, 209, 255, 0.1) 0%, transparent 70%);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-color);
+}
+
+.multiplier-container.crashed {
+  background: radial-gradient(circle, rgba(255, 59, 48, 0.1) 0%, transparent 70%);
+  animation: crash-shake 0.5s ease-in-out;
+}
+
+/* Desktop enhancements */
+@media (min-width: 1024px) {
+  .multiplier-display {
+    font-size: var(--font-4xl);
   }
-  to {
-    text-shadow: 0 0 20px rgba(34, 197, 94, 0.8);
+  
+  .multiplier-container {
+    margin: var(--space-2xl) 0;
   }
 }
 
 .game-status {
-  font-size: var(--font-lg);
-  font-weight: 600;
+  font-size: clamp(1rem, 3vw, 1.25rem);
+  font-weight: 700;
   text-align: center;
   margin-bottom: var(--space-md);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-lg);
+  display: inline-block;
 }
 
 .waiting-status {
   color: var(--warning-color);
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  text-shadow: var(--glow-warning);
 }
 
 .playing-status {
   color: var(--accent-green);
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  text-shadow: var(--glow-success);
+  animation: neon-pulse 2s ease-in-out infinite;
 }
 
 .crashed-status {
   color: var(--accent-red);
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  text-shadow: var(--glow-danger);
+  animation: danger-pulse 1s ease-in-out infinite;
 }
 
 /* Game State Colors */
@@ -183,7 +266,69 @@
   animation: game-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Game Controls */
+/* Mobile-First Action Bar */
+.mobile-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, rgba(26, 26, 46, 0) 0%, var(--bg-secondary) 20%, var(--bg-secondary) 100%);
+  backdrop-filter: blur(10px);
+  padding: var(--space-md);
+  z-index: 50;
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-actions-content {
+  display: flex;
+  gap: var(--space-sm);
+  max-width: 500px;
+  margin: 0 auto;
+  align-items: center;
+}
+
+.mobile-bet-input {
+  flex: 1;
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  font-size: var(--font-lg);
+  font-weight: 600;
+  text-align: center;
+  min-height: 48px; /* Touch-friendly */
+}
+
+.mobile-bet-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--glow-primary);
+}
+
+.mobile-action-btn {
+  flex: 1.5;
+  min-height: 48px;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-lg);
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+/* Hide mobile actions on desktop */
+@media (min-width: 1024px) {
+  .mobile-actions {
+    display: none;
+  }
+}
+
+/* Game Controls (Desktop) */
 .bet-input {
   background-color: var(--input-bg);
   border: 1px solid var(--border-color);
@@ -197,7 +342,7 @@
 
 .bet-input:focus {
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+  box-shadow: var(--glow-primary);
 }
 
 .amount-button {
@@ -214,22 +359,58 @@
   background-color: var(--bg-hover);
   border-color: var(--primary-color);
 }
-/* Bet Button Styles */
-.btn-bet {
-  background: linear-gradient(135deg, var(--secondary-color) 0%, #059669 100%);
+/* Mobile-First Neon Pulse Button Styles */
+.mobile-action-btn.btn-bet {
+  background: linear-gradient(135deg, var(--primary-color) 0%, #0099CC 100%);
+  color: var(--bg-primary);
+  text-shadow: var(--glow-primary);
+  box-shadow: var(--glow-primary);
+}
+
+.mobile-action-btn.btn-bet:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0099CC 0%, #007ACC 100%);
+  box-shadow: 0 0 20px rgba(0, 209, 255, 0.6), 0 0 30px rgba(0, 209, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.mobile-action-btn.btn-cashout {
+  background: linear-gradient(135deg, var(--secondary-color) 0%, #CC0044 100%);
   color: white;
+  text-shadow: var(--glow-secondary);
+  box-shadow: var(--glow-secondary);
+  animation: neon-pulse 2s ease-in-out infinite;
+}
+
+.mobile-action-btn.btn-cashout:hover:not(:disabled) {
+  background: linear-gradient(135deg, #CC0044 0%, #AA0033 100%);
+  box-shadow: 0 0 20px rgba(255, 45, 117, 0.6), 0 0 30px rgba(255, 45, 117, 0.4);
+  transform: translateY(-2px);
+}
+
+.mobile-action-btn:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  box-shadow: none;
+  animation: none;
+  cursor: not-allowed;
+}
+
+/* Desktop Button Styles */
+.btn-bet {
+  background: linear-gradient(135deg, var(--primary-color) 0%, #0099CC 100%);
+  color: var(--bg-primary);
   border: none;
   font-weight: 700;
   font-size: var(--font-lg);
   padding: var(--space-md) var(--space-xl);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+  box-shadow: var(--glow-primary);
   transition: all 0.2s ease;
 }
 
 .btn-bet:hover:not(:disabled) {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  background: linear-gradient(135deg, #0099CC 0%, #007ACC 100%);
+  box-shadow: 0 0 20px rgba(0, 209, 255, 0.6), 0 0 30px rgba(0, 209, 255, 0.4);
   transform: translateY(-2px);
 }
 
@@ -239,33 +420,24 @@
   box-shadow: none;
   cursor: not-allowed;
 }
-/* Cashout Button Styles */
+
 .btn-cashout {
-  background: linear-gradient(135deg, var(--danger-color) 0%, #dc2626 100%);
+  background: linear-gradient(135deg, var(--secondary-color) 0%, #CC0044 100%);
   color: white;
   border: none;
   font-weight: 700;
   font-size: var(--font-lg);
   padding: var(--space-md) var(--space-xl);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+  box-shadow: var(--glow-secondary);
   transition: all 0.2s ease;
-  animation: cash-out-pulse 2s ease-in-out infinite;
+  animation: neon-pulse 2s ease-in-out infinite;
 }
 
 .btn-cashout:hover:not(:disabled) {
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  background: linear-gradient(135deg, #CC0044 0%, #AA0033 100%);
+  box-shadow: 0 0 20px rgba(255, 45, 117, 0.6), 0 0 30px rgba(255, 45, 117, 0.4);
   transform: translateY(-2px);
-}
-
-@keyframes cash-out-pulse {
-  0%, 100% {
-    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
-  }
-  50% {
-    box-shadow: 0 4px 25px rgba(239, 68, 68, 0.5);
-  }
 }
 
 /* Live Bets Component Animations */
@@ -352,32 +524,50 @@
   padding: var(--space-md);
 }
 
-/* Responsive Design */
-@media (max-width: 768px) {
-  .game-container {
-    flex-direction: column;
+/* Mobile-First Responsive Design */
+.game-area .card {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.game-area .card h1 {
+  margin: 0 0 var(--space-md) 0;
+  font-size: var(--font-xl);
+  text-align: center;
+}
+
+.controls-container {
+  margin-top: var(--space-md);
+  background-color: var(--card-bg);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+}
+
+/* Tablet and Desktop Enhancements */
+@media (min-width: 768px) {
+  .game-area .card {
+    padding: var(--space-lg);
   }
   
-  .game-area,
-  .community-area {
-    width: 100%;
-  }
-  
-  .community-area {
-    border-left: none;
-    border-top: 1px solid var(--border-color);
-    max-height: 300px;
-  }
-  
-  .game-canvas {
-    height: 300px;
+  .game-area .card h1 {
+    font-size: var(--font-2xl);
+    text-align: left;
   }
   
   .controls-container {
-    padding: var(--space-md);
+    margin-top: var(--space-lg);
+    padding: var(--space-lg);
+  }
+}
+
+@media (min-width: 1024px) {
+  .game-area .card {
+    padding: var(--space-xl);
   }
   
-  .multiplier-display {
-    font-size: var(--font-2xl);
+  .game-area .card h1 {
+    margin: 0 0 var(--space-lg) 0;
   }
 }

@@ -112,12 +112,13 @@
 .game-canvas {
   width: 100%;
   height: 250px; /* Reduced height for mobile */
-  background-color: var(--bg-primary);
+  background: radial-gradient(ellipse at center, rgba(0, 209, 255, 0.05) 0%, var(--bg-primary) 70%);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-color);
   position: relative;
   overflow: hidden;
   margin-bottom: var(--space-md);
+  box-shadow: inset 0 1px 0 rgba(0, 209, 255, 0.1), 0 1px 20px rgba(0, 0, 0, 0.4);
 }
 
 /* Larger canvas on tablets and desktop */
@@ -425,12 +426,15 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(180deg, rgba(26, 26, 46, 0) 0%, var(--bg-secondary) 20%, var(--bg-secondary) 100%);
-  backdrop-filter: blur(10px);
+  background: linear-gradient(180deg, rgba(26, 26, 46, 0) 0%, rgba(26, 26, 46, 0.95) 20%, rgba(26, 26, 46, 0.98) 100%);
+  backdrop-filter: blur(12px) saturate(1.2);
   padding: var(--space-md);
   z-index: 50;
   border-top: 1px solid var(--border-color);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 
+    0 -4px 20px rgba(0, 0, 0, 0.4),
+    0 -1px 0 rgba(0, 209, 255, 0.15),
+    inset 0 1px 0 rgba(0, 209, 255, 0.1);
 }
 
 .mobile-actions-content {
@@ -626,14 +630,32 @@
   transform: translateY(-2px);
 }
 
-/* Live Bets Component Animations */
+/* Enhanced Live Bets Component with Neon Effects */
 .live-bet-item {
   animation: fadeInUp 0.5s ease-out;
-  background-color: var(--card-bg);
+  background: linear-gradient(135deg, var(--card-bg) 0%, rgba(26, 26, 46, 0.8) 100%);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: var(--space-sm) var(--space-md);
   margin-bottom: var(--space-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.live-bet-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--primary-color) 50%, transparent 100%);
+  animation: scan-line 3s ease-in-out infinite;
+}
+
+@keyframes scan-line {
+  0% { left: -100%; }
+  100% { left: 100%; }
 }
 
 @keyframes fadeInUp {
@@ -649,20 +671,23 @@
 
 .live-indicator {
   animation: live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  background-color: var(--accent-green);
+  background: radial-gradient(circle, var(--accent-green) 0%, rgba(0, 255, 136, 0.8) 70%);
   border-radius: 50%;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 6px var(--accent-green);
 }
 
 @keyframes live-pulse {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
+    box-shadow: 0 0 6px var(--accent-green);
   }
   50% {
-    opacity: 0.6;
-    transform: scale(1.2);
+    opacity: 0.7;
+    transform: scale(1.3);
+    box-shadow: 0 0 12px var(--accent-green), 0 0 24px rgba(0, 255, 136, 0.4);
   }
 }
 
@@ -699,21 +724,71 @@
   animation: neon-pulse 1.5s ease-in-out infinite;
 }
 
+/* Performance Optimizations for Low-End Devices */
+@media (max-width: 480px) and (max-height: 800px) {
+  .neon-pulse,
+  .danger-pulse,
+  .scan-line {
+    animation-duration: 3s; /* Slower animations on small devices */
+  }
+  
+  .mobile-actions {
+    backdrop-filter: blur(8px); /* Reduced blur for better performance */
+  }
+  
+  .game-canvas {
+    box-shadow: 0 1px 10px rgba(0, 0, 0, 0.3); /* Simplified shadows */
+  }
+}
+
+/* Cross-Browser Compatibility */
+.mobile-actions,
+.game-canvas,
+.multiplier-container {
+  /* Webkit browsers */
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000px;
+  
+  /* Standard browsers */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* GPU Acceleration for Smooth Animations */
+.multiplier-display,
+.mobile-action-btn,
+.crash-line,
+.live-bet-item {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
 /* Reduced Motion Support for Performance */
 @media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
   .multiplier-display,
   .mobile-action-btn,
   .crash-line,
-  .game-pulse {
-    animation: none !important;
-    transition: all 0.1s ease !important;
-  }
-  
+  .game-pulse,
   .neon-pulse,
   .danger-pulse,
   .success-ripple,
-  .crash-shake {
+  .crash-shake,
+  .scan-line,
+  .live-pulse {
     animation: none !important;
+  }
+  
+  .mobile-actions {
+    backdrop-filter: none;
+    background: var(--bg-secondary);
   }
 }
 

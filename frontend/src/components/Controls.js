@@ -43,6 +43,7 @@ const Controls = ({
   // Display amount should reflect the actual placed bet when active
   const displayBetAmount = hasActiveBet ? currentBetAmount : bet;
 
+  
   // Quick amount buttons matching the design
   const quickAmounts = [100, 200, 500, 10000];
 
@@ -91,9 +92,7 @@ const Controls = ({
                 <Minus size={16} className="text-white" />
               </button>
 
-              <div className="mx-6 text-center">
-                <div className="text-2xl font-bold text-white">{displayBetAmount.toFixed(2)}</div>
-              </div>
+              <div className="text-2xl font-bold text-white">{displayBetAmount.toFixed(2)}</div>
 
               <button
                 onClick={() => onBetChange({ target: { value: bet + 10 } })}

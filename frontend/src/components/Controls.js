@@ -51,25 +51,19 @@ const Controls = ({
     <div className="w-full bg-gray-800 p-4 rounded-lg">
       {/* ─ Bet/Auto Tabs ─────────────────────────────── */}
       <div className="flex justify-center mb-6">
-        <div className="flex bg-gray-900 rounded-lg p-1 w-64">
+        <div className="tab-container">
           <button
             onClick={() => setActiveTab('Bet')}
-            className={`flex-1 py-3 px-4 rounded-md font-bold text-sm transition-colors ${
-              activeTab === 'Bet'
-                ? 'bg-green-500 text-white shadow-md'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
+            className={`tab-button ${activeTab === 'Bet' ? 'tab-active' : 'tab-inactive'}`}
           >
-            MANUAL
+            <span className="tab-icon">⚡</span>
+            TACTICAL
           </button>
           <button
             onClick={() => setActiveTab('Auto')}
-            className={`flex-1 py-3 px-4 rounded-md font-bold text-sm transition-colors ${
-              activeTab === 'Auto'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
-            }`}
+            className={`tab-button ${activeTab === 'Auto' ? 'tab-active' : 'tab-inactive'}`}
           >
+            <span className="tab-icon">🤖</span>
             AUTO
           </button>
         </div>
@@ -81,54 +75,54 @@ const Controls = ({
       {/* ─ Manual Betting Content ─────────────────────────────── */}
       {activeTab === 'Bet' && (
         <div>
-          {/* ─ Amount Controls Row ─────────────────────────────── */}
-          <div className="flex items-center mb-6">
-            {/* Left: -/+ Amount Controls */}
-            <div className="flex items-center">
-              <button
-                onClick={() => onBetChange({ target: { value: Math.max(10, bet - 10) } })}
-                className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600"
-              >
-                <Minus size={16} className="text-white" />
-              </button>
+          {/* ─ Calculator Layout - Amount Input + Controls + Quick Amounts ─────────────────────────────── */}
+          <div className="flex justify-center mb-6">
+            <div className="calculator-layout">
+              {/* Amount Display Row */}
+              <div className="amount-display">
+                {displayBetAmount.toFixed(2)} KES
+              </div>
+              
+              {/* Amount Controls Row */}
+              <div className="amount-controls-row">
+                <button
+                  onClick={() => onBetChange({ target: { value: Math.max(10, bet - 10) } })}
+                  disabled={!canPlaceBet}
+                  className="calc-control-btn"
+                >
+                  <Minus size={16} />
+                </button>
+                
+                <button
+                  onClick={() => onBetChange({ target: { value: bet + 10 } })}
+                  disabled={!canPlaceBet}
+                  className="calc-control-btn"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
 
-              <div className="text-2xl font-bold text-white">{displayBetAmount.toFixed(2)}</div>
-
-              <button
-                onClick={() => onBetChange({ target: { value: bet + 10 } })}
-                className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600"
-              >
-                <Plus size={16} className="text-white" />
-              </button>
+              {/* Quick Amount Grid */}
+              <div className="quick-amount-grid">
+                {quickAmounts.map(amount => (
+                  <button
+                    key={amount}
+                    onClick={() => onQuickSelect(amount)}
+                    disabled={!canPlaceBet}
+                    className="amount-button"
+                  >
+                    {amount.toLocaleString()}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* ─ Two Column Layout ─────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-8 mb-6">
-            {/* Column 1: Amount Controls and Quick Grid */}
-            <div className="space-y-6">
-              {/* Quick Amount Grid */}
-              <div className="flex justify-center">
-                <div className="grid grid-cols-2 gap-2 w-40 h-20">
-                  {quickAmounts.map(amount => (
-                    <button
-                      key={amount}
-                      onClick={() => onQuickSelect(amount)}
-                      disabled={!canPlaceBet}
-                      className="bg-gray-700 rounded-lg text-white text-sm font-medium hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                    >
-                      {amount.toLocaleString()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Column 2: Bet and Cash Out Buttons */}
-            <div className="flex flex-col items-center justify-center gap-3">
-              {/* Bet Button - Shows when no active bet */}
-              {!hasActiveBet && (
-                <button
+          {/* ─ Bet and Cash Out Buttons - Centered ─────────────────────────────── */}
+          <div className="flex flex-col items-center justify-center gap-3">
+            {/* Bet Button - Shows when no active bet */}
+            {!hasActiveBet && (
+              <button
                   onClick={() => onPlaceBet(bet)}
                   disabled={!canPlaceBet}
                   style={{
@@ -159,11 +153,11 @@ const Controls = ({
                 >
                   Bet {bet.toFixed(2)} KES
                 </button>
-              )}
+            )}
 
-              {/* Cash Out Button - Shows when user has active bet */}
-              {showCashOutButton && (
-                <button
+            {/* Cash Out Button - Shows when user has active bet */}
+            {showCashOutButton && (
+              <button
                   onClick={onCashOut}
                   disabled={!canCashOut}
                   style={{
@@ -200,121 +194,157 @@ const Controls = ({
                       : `Waiting...`
                   }
                 </button>
-              )}
+            )}
 
-              {/* Status Indicator */}
-              {hasActiveBet && (
-                <div className="text-sm text-gray-400 mt-2">
-                  {isRunning && (
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                      Game Running - Multiplier: {multiplier.toFixed(2)}x
-                    </span>
-                  )}
-                  {isWaiting && (
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
-                      Waiting for round to start...
-                    </span>
-                  )}
-                  {isEnded && (
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
-                      Round ended
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* Status Indicator */}
+            {hasActiveBet && (
+              <div className="text-sm text-gray-400 mt-2">
+                {isRunning && (
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    Game Running - Multiplier: {multiplier.toFixed(2)}x
+                  </span>
+                )}
+                {isWaiting && (
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+                    Waiting for round to start...
+                  </span>
+                )}
+                {isEnded && (
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 bg-gray-500 rounded-full"></span>
+                    Round ended
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* ─ Auto Betting Content ─────────────────────────────── */}
       {activeTab === 'Auto' && (
-        <div>
-          {/* Auto Bet Amount */}
-          <div className="mb-4">
-            <label className="block text-sm text-gray-300 mb-2">Bet Amount</label>
-            <div className="flex items-center">
-              <button
-                onClick={() => setAutoBetAmount(Math.max(10, autoBetAmount - 10))}
-                disabled={!isWaiting || hasActiveBet}
-                className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 disabled:opacity-50"
-              >
-                <Minus size={16} className="text-white" />
-              </button>
-              <div className="mx-4 text-xl font-bold text-white min-w-[80px] text-center">
-                {autoBetAmount.toFixed(2)}
+        <div className="auto-betting-container">
+          {/* Bot Configuration Card */}
+          <div className="auto-card bot-config-card">
+            <div className="auto-card-header">
+              <span className="auto-card-icon">🤖</span>
+              <h3 className="auto-card-title">Bot Configuration</h3>
+            </div>
+            
+            {/* Auto Bet Amount */}
+            <div className="auto-input-group">
+              <label className="auto-label">
+                <span className="auto-label-icon">💰</span>
+                Deployment Amount
+              </label>
+              <div className="auto-amount-controls">
+                <button
+                  onClick={() => setAutoBetAmount(Math.max(10, autoBetAmount - 10))}
+                  disabled={!isWaiting || hasActiveBet}
+                  className="auto-control-btn"
+                >
+                  <Minus size={16} />
+                </button>
+                <div className="auto-amount-display">
+                  {autoBetAmount.toFixed(2)} KES
+                </div>
+                <button
+                  onClick={() => setAutoBetAmount(autoBetAmount + 10)}
+                  disabled={!isWaiting || hasActiveBet}
+                  className="auto-control-btn"
+                >
+                  <Plus size={16} />
+                </button>
               </div>
-              <button
-                onClick={() => setAutoBetAmount(autoBetAmount + 10)}
-                disabled={!isWaiting || hasActiveBet}
-                className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center hover:bg-gray-600 disabled:opacity-50"
-              >
-                <Plus size={16} className="text-white" />
-              </button>
+            </div>
+
+            {/* Auto Cash Out */}
+            <div className="auto-input-group">
+              <label className="auto-label">
+                <span className="auto-label-icon">🎯</span>
+                Emergency Extraction at
+              </label>
+              <div className="auto-cashout-controls">
+                <input
+                  type="number"
+                  value={autoCashOut}
+                  onChange={(e) => setAutoCashOut(parseFloat(e.target.value) || 1.0)}
+                  min="1.01"
+                  step="0.01"
+                  disabled={!isWaiting || hasActiveBet}
+                  className="auto-input"
+                />
+                <span className="auto-multiplier-x">✨</span>
+              </div>
             </div>
           </div>
 
-          {/* Auto Cash Out */}
-          <div className="mb-4">
-            <label className="block text-sm text-gray-300 mb-2">Auto Cash Out at</label>
-            <div className="flex items-center">
+          {/* Battle Plan Card */}
+          <div className="auto-card battle-plan-card">
+            <div className="auto-card-header">
+              <span className="auto-card-icon">⚔️</span>
+              <h3 className="auto-card-title">Battle Plan</h3>
+            </div>
+
+            {/* Number of Bets */}
+            <div className="auto-input-group">
+              <label className="auto-label">
+                <span className="auto-label-icon">🔢</span>
+                Combat Sorties
+              </label>
               <input
                 type="number"
-                value={autoCashOut}
-                onChange={(e) => setAutoCashOut(parseFloat(e.target.value) || 1.0)}
-                min="1.01"
-                step="0.01"
+                value={numberOfBets}
+                onChange={(e) => setNumberOfBets(parseInt(e.target.value) || 1)}
+                min="1"
                 disabled={!isWaiting || hasActiveBet}
-                className="bg-gray-700 text-white px-3 py-2 rounded-lg w-24 mr-2 disabled:opacity-50"
+                className="auto-input"
               />
-              <span className="text-gray-300">x</span>
+            </div>
+
+            {/* Stop Conditions */}
+            <div className="auto-input-group">
+              <label className="auto-label">
+                <span className="auto-label-icon">🛡️</span>
+                Stop Conditions
+              </label>
+              <div className="auto-toggles">
+                <label className="auto-toggle-wrapper">
+                  <input
+                    type="checkbox"
+                    checked={stopOnWin}
+                    onChange={(e) => setStopOnWin(e.target.checked)}
+                    disabled={!isWaiting || hasActiveBet}
+                    className="auto-toggle-input"
+                  />
+                  <div className="auto-toggle-slider"></div>
+                  <span className="auto-toggle-label">
+                    <span className="auto-toggle-icon">🏆</span>
+                    Stop on Victory
+                  </span>
+                </label>
+                
+                <label className="auto-toggle-wrapper">
+                  <input
+                    type="checkbox"
+                    checked={stopOnLoss}
+                    onChange={(e) => setStopOnLoss(e.target.checked)}
+                    disabled={!isWaiting || hasActiveBet}
+                    className="auto-toggle-input"
+                  />
+                  <div className="auto-toggle-slider"></div>
+                  <span className="auto-toggle-label">
+                    <span className="auto-toggle-icon">💀</span>
+                    Stop on Defeat
+                  </span>
+                </label>
+              </div>
             </div>
           </div>
 
-          {/* Number of Bets */}
-          <div className="mb-4">
-            <label className="block text-sm text-gray-300 mb-2">Number of Bets</label>
-            <input
-              type="number"
-              value={numberOfBets}
-              onChange={(e) => setNumberOfBets(parseInt(e.target.value) || 1)}
-              min="1"
-              disabled={!isWaiting || hasActiveBet}
-              className="bg-gray-700 text-white px-3 py-2 rounded-lg w-24 disabled:opacity-50"
-            />
-          </div>
-
-          {/* Stop Conditions */}
-          <div className="mb-6">
-            <label className="block text-sm text-gray-300 mb-2">Stop Conditions</label>
-            <div className="space-y-2">
-              <label className="flex items-center text-sm text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={stopOnWin}
-                  onChange={(e) => setStopOnWin(e.target.checked)}
-                  disabled={!isWaiting || hasActiveBet}
-                  className="mr-2 disabled:opacity-50"
-                />
-                Stop on win
-              </label>
-              <label className="flex items-center text-sm text-gray-300">
-                <input
-                  type="checkbox"
-                  checked={stopOnLoss}
-                  onChange={(e) => setStopOnLoss(e.target.checked)}
-                  disabled={!isWaiting || hasActiveBet}
-                  className="mr-2 disabled:opacity-50"
-                />
-                Stop on loss
-              </label>
-            </div>
-          </div>
-
-          {/* Auto Bet Button */}
+          {/* Launch Control */}
           <button
             onClick={() => {
               // TODO: Implement auto betting logic
@@ -327,16 +357,10 @@ const Controls = ({
               });
             }}
             disabled={!isWaiting || hasActiveBet}
-            className={`
-              w-full h-12 font-bold text-lg rounded-xl
-              ${!hasActiveBet && isWaiting
-                ? 'bg-blue-500 text-white hover:bg-blue-600'
-                : 'bg-gray-600 text-gray-400'
-              }
-              ${(!isWaiting || hasActiveBet) ? 'opacity-50 cursor-not-allowed' : ''}
-            `}
+            className="auto-launch-button"
           >
-            Start Auto Betting
+            <span className="auto-launch-icon">🚀</span>
+            {!hasActiveBet && isWaiting ? 'ACTIVATE AUTO PILOT' : 'AUTO PILOT OFFLINE'}
           </button>
         </div>
       )}

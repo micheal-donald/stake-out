@@ -582,7 +582,7 @@
 /* Responsive styles */
 @media (max-width: 768px) {
   .wallet-container {
-    padding: 1rem;
+    padding: 0.5rem;
   }
 
   .balance-amount {

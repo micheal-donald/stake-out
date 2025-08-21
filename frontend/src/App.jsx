@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 
 // Import components
@@ -28,27 +28,63 @@ const PrivateRoute = ({ children }) => {
 
 // Main navbar component
 const Navbar = ({ isAuthenticated, logout, user }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const closeMobileMenu = () => {
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <Link to="/">Stake Out Bet</Link>
+        <Link to="/" onClick={closeMobileMenu}>
+          <span className="brand-icon">⚔️</span>
+          Stake Out Bet
+          <span className="brand-subtitle">Battle Arena</span>
+        </Link>
       </div>
       
-      <div className="navbar-menu">
+      {/* Hamburger menu button */}
+      <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+        <span className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}>
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
+      </button>
+      
+      <div className={`navbar-menu ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
         {isAuthenticated ? (
           <>
             <div className="user-balance">
-              Balance: ${parseFloat(user?.balance || 0).toFixed(2)}
+              <span className="balance-icon">💰</span>
+              Credits: ${parseFloat(user?.balance || 0).toFixed(2)}
             </div>
-            <Link to="/profile">Profile</Link>
-            <Link to="/wallet">Wallet</Link>
-            <Link to="/history">Bet History</Link>
-            <button onClick={logout} className="logout-btn">Logout</button>
+            <Link to="/profile" onClick={closeMobileMenu}>
+              <span className="nav-icon">🛡️</span>Intel
+            </Link>
+            <Link to="/wallet" onClick={closeMobileMenu}>
+              <span className="nav-icon">⚙️</span>Arsenal
+            </Link>
+            <Link to="/history" onClick={closeMobileMenu}>
+              <span className="nav-icon">⚔️</span>Battle History
+            </Link>
+            <button onClick={() => { logout(); closeMobileMenu(); }} className="logout-btn">
+              <span className="logout-icon">🚪</span>Disengage
+            </button>
           </>
         ) : (
           <>
-            <Link to="/login">Login</Link>
-            <Link to="/register">Register</Link>
+            <Link to="/login" onClick={closeMobileMenu}>
+              <span className="nav-icon">🎯</span>Deploy
+            </Link>
+            <Link to="/register" onClick={closeMobileMenu}>
+              <span className="nav-icon">⭐</span>Enlist
+            </Link>
           </>
         )}
       </div>
@@ -56,33 +92,43 @@ const Navbar = ({ isAuthenticated, logout, user }) => {
   );
 };
 
-// Home/Dashboard component
+// Command Center/Dashboard component  
 const Dashboard = () => {
   return (
-    <div className="dashboard">
-      <h2>Welcome to Stake Out Bet!</h2>
+    <div className="dashboard command-center">
+      <div className="command-center-header">
+        <h2><span className="header-icon">🏛️</span>Command Center</h2>
+        <p className="welcome-message">Welcome to the Battle Arena, Commander!</p>
+      </div>
       
-      <div className="dashboard-actions">
-        <Link to="/profile" className="dashboard-card">
-          <h3>Profile</h3>
-          <p>Manage your account and settings</p>
+      <div className="dashboard-actions battle-grid">
+        <Link to="/profile" className="dashboard-card intel-card">
+          <div className="card-icon">🛡️</div>
+          <h3>Intel Dashboard</h3>
+          <p>Commander profile and combat statistics</p>
         </Link>
         
-        <Link to="/history" className="dashboard-card">
-          <h3>Bet History</h3>
-          <p>View your betting history and statistics</p>
+        <Link to="/history" className="dashboard-card archives-card">
+          <div className="card-icon">⚔️</div>
+          <h3>Battle Archives</h3>
+          <p>Review combat history and performance metrics</p>
         </Link>
         
-        <Link to="/wallet" className="dashboard-card">
-          <h3>Wallet</h3>
-          <p>Deposit and withdraw funds</p>
+        <Link to="/wallet" className="dashboard-card arsenal-card">
+          <div className="card-icon">⚙️</div>
+          <h3>Arsenal Management</h3>
+          <p>Deploy and extract combat resources</p>
         </Link>
         
-        {/* Game card */}
-        <div className="dashboard-card betting-card">
-          <h3>Place Bets</h3>
-          <p>Start playing and win big!</p>
-          <button className="play-btn">Play Now</button>
+        {/* Combat Deployment card */}
+        <div className="dashboard-card combat-card">
+          <div className="card-icon">🚀</div>
+          <h3>Deploy to Combat</h3>
+          <p>Enter the battle arena and claim victory!</p>
+          <button className="deploy-btn">
+            <span className="btn-icon">⚡</span>
+            Deploy Now
+          </button>
         </div>
       </div>
     </div>

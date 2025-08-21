@@ -64,101 +64,110 @@ const LiveBetsComponent = ({ gameState, activePlayers = 0, socketRef }) => {
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 w-full max-w-md">
+    <div className="battle-intel-feed">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-white flex items-center">
-          <Users size={18} className="mr-2 text-blue-400" />
-          Live Bets
-        </h3>
-        <div className="text-sm text-gray-400">
-          {activePlayers} players
+      <div className="intel-header">
+        <div className="intel-title">
+          <span className="intel-icon">📡</span>
+          <h3>BATTLE INTEL</h3>
+          <div className="intel-scanner"></div>
+        </div>
+        <div className="active-pilots">
+          <span className="pilot-icon">👥</span>
+          <span className="pilot-count">{activePlayers}</span>
+          <span className="pilot-label">ACTIVE</span>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="bg-gray-700 rounded-lg p-3 text-center">
-          <div className="flex items-center justify-center mb-1">
-            <TrendingUp size={16} className="text-green-400 mr-1" />
-            <span className="text-xs text-gray-400">Total Staked</span>
+      {/* Battle Stats */}
+      <div className="combat-stats-grid">
+        <div className="combat-stat-card">
+          <div className="stat-header">
+            <span className="stat-icon">💰</span>
+            <span className="stat-label">TOTAL DEPLOYED</span>
           </div>
-          <div className="text-lg font-bold text-white">
-            ${totalStaked.toLocaleString()}
+          <div className="stat-value">
+            ${totalStaked.toLocaleString()} KES
           </div>
+          <div className="stat-pulse"></div>
         </div>
-        <div className="bg-gray-700 rounded-lg p-3 text-center">
-          <div className="flex items-center justify-center mb-1">
-            <DollarSign size={16} className="text-yellow-400 mr-1" />
-            <span className="text-xs text-gray-400">Avg Bet</span>
+        <div className="combat-stat-card">
+          <div className="stat-header">
+            <span className="stat-icon">⚖️</span>
+            <span className="stat-label">AVG SORTIE</span>
           </div>
-          <div className="text-lg font-bold text-white">
-            ${liveBets.length > 0 ? Math.round(totalStaked / liveBets.length) : 0}
+          <div className="stat-value">
+            ${liveBets.length > 0 ? Math.round(totalStaked / liveBets.length) : 0} KES
           </div>
+          <div className="stat-pulse"></div>
         </div>
       </div>
 
-      {/* Live Bets List */}
-      <div className="space-y-2 max-h-64 overflow-y-auto">
+      {/* Active Deployments */}
+      <div className="deployment-feed">
         {liveBets.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Users size={32} className="mx-auto mb-2 opacity-50" />
-            <p>No active bets yet</p>
-            <p className="text-xs">Be the first to place a bet!</p>
+          <div className="no-deployments">
+            <div className="empty-radar">
+              <div className="radar-sweep"></div>
+              <div className="radar-blips"></div>
+            </div>
+            <p className="no-activity-text">No active deployments detected</p>
+            <p className="recruitment-call">Commander, lead the charge!</p>
           </div>
         ) : (
           liveBets.map((bet) => (
             <div
               key={bet.id}
-              className="bg-gray-700 rounded-lg p-3 border-l-4 border-blue-500 animate-fade-in"
+              className="deployment-card"
             >
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-white text-sm">
-                      {maskUsername(bet.username)}
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      {timeAgo(bet.timestamp)}
-                    </span>
+              <div className="deployment-status"></div>
+              <div className="deployment-info">
+                <div className="pilot-data">
+                  <span className="pilot-callsign">
+                    <span className="callsign-prefix">PILOT-</span>
+                    {maskUsername(bet.username)}
+                  </span>
+                  <span className="mission-time">
+                    {timeAgo(bet.timestamp)}
+                  </span>
+                </div>
+                
+                <div className="mission-details">
+                  <div className="deployment-amount">
+                    <span className="amount-icon">💰</span>
+                    <span className="amount-value">${bet.amount} KES</span>
                   </div>
-                  
-                  <div className="flex items-center justify-between mt-1">
-                    <span className="text-green-400 font-bold">
-                      ${bet.amount}
-                    </span>
-                    {bet.autoCashout && (
-                      <span className="text-xs bg-gray-600 px-2 py-1 rounded text-gray-300">
-                        Auto: {bet.autoCashout}x
-                      </span>
-                    )}
-                  </div>
+                  {bet.autoCashout && (
+                    <div className="auto-extraction">
+                      <span className="auto-icon">🤖</span>
+                      <span className="auto-value">{bet.autoCashout}x</span>
+                    </div>
+                  )}
                 </div>
               </div>
+              <div className="deployment-ping"></div>
             </div>
           ))
         )}
       </div>
 
-      {/* Game State Indicator */}
-      <div className="mt-4 text-center">
-        <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+      {/* Mission Status */}
+      <div className="mission-status-container">
+        <div className={`mission-status ${
           gameState === 'waiting' 
-            ? 'bg-yellow-900 text-yellow-300' 
+            ? 'status-standby' 
             : gameState === 'running'
-            ? 'bg-green-900 text-green-300'
-            : 'bg-red-900 text-red-300'
+            ? 'status-combat'
+            : 'status-complete'
         }`}>
-          <div className={`w-2 h-2 rounded-full mr-2 ${
-            gameState === 'waiting' 
-              ? 'bg-yellow-400 animate-pulse' 
-              : gameState === 'running'
-              ? 'bg-green-400 animate-pulse'
-              : 'bg-red-400'
-          }`}></div>
-          {gameState === 'waiting' && 'Accepting Bets'}
-          {gameState === 'running' && 'Game in Progress'}
-          {gameState === 'crashed' && 'Round Ended'}
+          <div className="status-indicator">
+            <div className="status-pulse"></div>
+          </div>
+          <span className="status-text">
+            {gameState === 'waiting' && '🎯 ACCEPTING DEPLOYMENT'}
+            {gameState === 'running' && '⚔️ COMBAT IN PROGRESS'}
+            {gameState === 'crashed' && '💥 MISSION COMPLETE'}
+          </span>
         </div>
       </div>
     </div>

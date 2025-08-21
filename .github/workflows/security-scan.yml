@@ -1,0 +1,297 @@
+# Security Scanning Workflow for Stake Out Bet
+# Runs comprehensive security scans on code and dependencies
+
+name: Security Scan
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # ========================================
+  # DEPENDENCY VULNERABILITY SCAN
+  # ========================================
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        directory: [backend, frontend]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+        
+    - name: Install dependencies
+      working-directory: ./${{ matrix.directory }}
+      run: npm ci --prefer-offline --no-audit
+      
+    - name: Run npm audit
+      working-directory: ./${{ matrix.directory }}
+      run: |
+        npm audit --audit-level=moderate --production
+        npm audit --json --production > audit-report.json || true
+        
+    - name: Upload audit report
+      uses: actions/upload-artifact@v4
+      with:
+        name: npm-audit-${{ matrix.directory }}
+        path: ${{ matrix.directory }}/audit-report.json
+        retention-days: 30
+
+  # ========================================
+  # STATIC CODE ANALYSIS
+  # ========================================
+  sast-scan:
+    name: Static Application Security Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Run Semgrep
+      uses: returntocorp/semgrep-action@v1
+      with:
+        config: >-
+          p/security-audit
+          p/secrets
+          p/nodejs
+          p/react
+        generateSarif: "1"
+        
+    - name: Upload Semgrep results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: semgrep.sarif
+
+  # ========================================
+  # SECRET SCANNING
+  # ========================================
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Run TruffleHog
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: main
+        head: HEAD
+        extra_args: --debug --only-verified
+
+  # ========================================
+  # CONTAINER IMAGE SCANNING
+  # ========================================
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    strategy:
+      matrix:
+        service: [backend, frontend]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Build Docker image
+      run: |
+        docker build -t stakeoutbet/${{ matrix.service }}:scan ./${{ matrix.service }}
+        
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: stakeoutbet/${{ matrix.service }}:scan
+        format: 'sarif'
+        output: 'trivy-${{ matrix.service }}.sarif'
+        severity: 'CRITICAL,HIGH'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-${{ matrix.service }}.sarif'
+        category: 'trivy-${{ matrix.service }}'
+
+  # ========================================
+  # INFRASTRUCTURE SECURITY SCAN
+  # ========================================
+  infrastructure-scan:
+    name: Infrastructure Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Checkov for IaC security
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: deployment/
+        framework: kubernetes,dockerfile
+        output_format: sarif
+        output_file_path: checkov.sarif
+        
+    - name: Upload Checkov results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: checkov.sarif
+
+  # ========================================
+  # LICENSE COMPLIANCE SCAN
+  # ========================================
+  license-scan:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        directory: [backend, frontend]
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: ${{ matrix.directory }}/package-lock.json
+        
+    - name: Install dependencies
+      working-directory: ./${{ matrix.directory }}
+      run: npm ci --prefer-offline --no-audit
+      
+    - name: Install license-checker
+      run: npm install -g license-checker
+      
+    - name: Check licenses
+      working-directory: ./${{ matrix.directory }}
+      run: |
+        # Generate license report
+        license-checker --json --out licenses-${{ matrix.directory }}.json
+        
+        # Check for prohibited licenses
+        license-checker --failOn 'GPL-2.0;GPL-3.0;AGPL-1.0;AGPL-3.0' --summary
+        
+    - name: Upload license report
+      uses: actions/upload-artifact@v4
+      with:
+        name: license-report-${{ matrix.directory }}
+        path: ${{ matrix.directory }}/licenses-${{ matrix.directory }}.json
+        retention-days: 30
+
+  # ========================================
+  # SECURITY REPORT SUMMARY
+  # ========================================
+  security-report:
+    name: Security Report Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-scan, sast-scan, secret-scan, container-scan, infrastructure-scan, license-scan]
+    if: always()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Generate security summary
+      run: |
+        echo "# Security Scan Summary" > security-summary.md
+        echo "" >> security-summary.md
+        echo "**Scan Date:** $(date -u)" >> security-summary.md
+        echo "**Repository:** ${{ github.repository }}" >> security-summary.md
+        echo "**Branch:** ${{ github.ref_name }}" >> security-summary.md
+        echo "**Commit:** ${{ github.sha }}" >> security-summary.md
+        echo "" >> security-summary.md
+        
+        echo "## Scan Results" >> security-summary.md
+        echo "" >> security-summary.md
+        echo "| Scan Type | Status |" >> security-summary.md
+        echo "|-----------|--------|" >> security-summary.md
+        echo "| Dependency Scan | ${{ needs.dependency-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> security-summary.md
+        echo "| Static Analysis | ${{ needs.sast-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> security-summary.md
+        echo "| Secret Detection | ${{ needs.secret-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> security-summary.md
+        echo "| Container Scan | ${{ needs.container-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> security-summary.md
+        echo "| Infrastructure Scan | ${{ needs.infrastructure-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> security-summary.md
+        echo "| License Compliance | ${{ needs.license-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> security-summary.md
+        echo "" >> security-summary.md
+        
+        # Add recommendations if any scans failed
+        if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+          echo "## 🔴 Action Required" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "Some security scans have failed. Please review the detailed results and address any issues before proceeding with deployment." >> security-summary.md
+          echo "" >> security-summary.md
+          echo "### Next Steps:" >> security-summary.md
+          echo "1. Review the Security tab in GitHub for detailed findings" >> security-summary.md
+          echo "2. Update vulnerable dependencies using \`npm audit fix\`" >> security-summary.md
+          echo "3. Address any secrets or sensitive information detected" >> security-summary.md
+          echo "4. Review and update Docker base images if needed" >> security-summary.md
+          echo "5. Re-run security scans after fixes" >> security-summary.md
+        else
+          echo "## ✅ All Clear" >> security-summary.md
+          echo "" >> security-summary.md
+          echo "All security scans have passed successfully. The codebase meets our security standards." >> security-summary.md
+        fi
+        
+        cat security-summary.md
+        
+    - name: Upload security summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-summary
+        path: security-summary.md
+        retention-days: 90
+        
+    - name: Comment on PR with security results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const summary = fs.readFileSync('security-summary.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: summary
+          });
+    
+    - name: Fail if security issues found
+      if: contains(needs.*.result, 'failure')
+      run: |
+        echo "❌ Security scans have failed. Please review and address the issues."
+        exit 1

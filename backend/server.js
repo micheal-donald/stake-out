@@ -40,6 +40,10 @@ app.use(cors({
   credentials: true
 }));
 
+// Health check route for production monitoring
+const healthCheck = require('./server.health');
+app.get('/health', healthCheck);
+
 // Root route
 app.get('/', (req, res) => {
   res.json({

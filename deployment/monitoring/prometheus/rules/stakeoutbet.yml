@@ -1,0 +1,287 @@
+# Prometheus Alerting Rules for Stake Out Bet Application
+# Defines critical, warning, and info level alerts
+
+groups:
+  # ========================================
+  # APPLICATION HEALTH ALERTS
+  # ========================================
+  - name: stakeoutbet.application
+    rules:
+    # Backend service down
+    - alert: BackendServiceDown
+      expr: up{job="stakeoutbet-backend"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: backend
+      annotations:
+        summary: "Stake Out Bet backend service is down"
+        description: "The backend service has been down for more than 1 minute"
+        runbook_url: "https://docs.stakeoutbet.com/runbooks/backend-service-down"
+
+    # Frontend service down
+    - alert: FrontendServiceDown
+      expr: up{job="blackbox-http", instance="https://stakeoutbet.com"} == 0
+      for: 2m
+      labels:
+        severity: critical
+        service: frontend
+      annotations:
+        summary: "Stake Out Bet website is unreachable"
+        description: "The main website has been unreachable for more than 2 minutes"
+
+    # High response time
+    - alert: HighResponseTime
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="stakeoutbet-backend"}[5m])) > 2
+      for: 5m
+      labels:
+        severity: warning
+        service: backend
+      annotations:
+        summary: "High response time detected"
+        description: "95th percentile response time is {{ $value }}s"
+
+    # High error rate
+    - alert: HighErrorRate
+      expr: (rate(http_requests_total{job="stakeoutbet-backend",status=~"5.."}[5m]) / rate(http_requests_total{job="stakeoutbet-backend"}[5m])) * 100 > 5
+      for: 3m
+      labels:
+        severity: critical
+        service: backend
+      annotations:
+        summary: "High error rate detected"
+        description: "Error rate is {{ $value }}% over the last 5 minutes"
+
+    # WebSocket connection issues
+    - alert: WebSocketConnectionDrop
+      expr: increase(websocket_connections_dropped_total{job="stakeoutbet-backend"}[5m]) > 100
+      for: 2m
+      labels:
+        severity: warning
+        service: backend
+      annotations:
+        summary: "High WebSocket connection drops"
+        description: "{{ $value }} WebSocket connections dropped in the last 5 minutes"
+
+  # ========================================
+  # INFRASTRUCTURE ALERTS
+  # ========================================
+  - name: stakeoutbet.infrastructure
+    rules:
+    # High CPU usage
+    - alert: HighCPUUsage
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+      for: 5m
+      labels:
+        severity: warning
+        component: infrastructure
+      annotations:
+        summary: "High CPU usage on {{ $labels.instance }}"
+        description: "CPU usage is {{ $value }}%"
+
+    # High memory usage
+    - alert: HighMemoryUsage
+      expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+      for: 5m
+      labels:
+        severity: warning
+        component: infrastructure
+      annotations:
+        summary: "High memory usage on {{ $labels.instance }}"
+        description: "Memory usage is {{ $value }}%"
+
+    # Low disk space
+    - alert: LowDiskSpace
+      expr: (1 - (node_filesystem_avail_bytes{fstype!="tmpfs"} / node_filesystem_size_bytes{fstype!="tmpfs"})) * 100 > 90
+      for: 5m
+      labels:
+        severity: critical
+        component: infrastructure
+      annotations:
+        summary: "Low disk space on {{ $labels.instance }}"
+        description: "Disk usage is {{ $value }}% on {{ $labels.device }}"
+
+    # Container restart
+    - alert: ContainerRestart
+      expr: increase(kube_pod_container_status_restarts_total{namespace="stakeoutbet"}[1h]) > 3
+      for: 0m
+      labels:
+        severity: warning
+        component: kubernetes
+      annotations:
+        summary: "Container {{ $labels.container }} restarted frequently"
+        description: "Container has restarted {{ $value }} times in the last hour"
+
+  # ========================================
+  # DATABASE ALERTS
+  # ========================================
+  - name: stakeoutbet.database
+    rules:
+    # Database connection issues
+    - alert: DatabaseConnectionFailure
+      expr: pg_up == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: database
+      annotations:
+        summary: "PostgreSQL database is down"
+        description: "Cannot connect to PostgreSQL database"
+
+    # High database connections
+    - alert: HighDatabaseConnections
+      expr: (pg_stat_database_numbackends / pg_settings_max_connections) * 100 > 80
+      for: 5m
+      labels:
+        severity: warning
+        service: database
+      annotations:
+        summary: "High database connection usage"
+        description: "Database connection usage is {{ $value }}%"
+
+    # Slow queries
+    - alert: SlowDatabaseQueries
+      expr: rate(pg_stat_user_tables_seq_scan[5m]) > 100
+      for: 5m
+      labels:
+        severity: warning
+        service: database
+      annotations:
+        summary: "High number of sequential scans"
+        description: "{{ $value }} sequential scans per second, consider adding indexes"
+
+    # Database disk usage
+    - alert: DatabaseDiskUsage
+      expr: (pg_database_size_bytes / (1024*1024*1024)) > 50
+      for: 5m
+      labels:
+        severity: warning
+        service: database
+      annotations:
+        summary: "Database size is growing"
+        description: "Database size is {{ $value }}GB"
+
+  # ========================================
+  # REDIS CACHE ALERTS
+  # ========================================
+  - name: stakeoutbet.redis
+    rules:
+    # Redis down
+    - alert: RedisDown
+      expr: redis_up == 0
+      for: 1m
+      labels:
+        severity: critical
+        service: redis
+      annotations:
+        summary: "Redis cache is down"
+        description: "Redis cache service is not responding"
+
+    # High memory usage
+    - alert: RedisHighMemoryUsage
+      expr: (redis_memory_used_bytes / redis_memory_max_bytes) * 100 > 90
+      for: 5m
+      labels:
+        severity: warning
+        service: redis
+      annotations:
+        summary: "Redis memory usage is high"
+        description: "Redis memory usage is {{ $value }}%"
+
+    # Low cache hit rate
+    - alert: RedisLowHitRate
+      expr: rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) < 0.8
+      for: 10m
+      labels:
+        severity: warning
+        service: redis
+      annotations:
+        summary: "Redis cache hit rate is low"
+        description: "Cache hit rate is {{ $value | humanizePercentage }}"
+
+  # ========================================
+  # BUSINESS LOGIC ALERTS
+  # ========================================
+  - name: stakeoutbet.business
+    rules:
+    # Unusual betting patterns (potential fraud)
+    - alert: UnusualBettingActivity
+      expr: rate(game_bets_total[5m]) > 1000
+      for: 2m
+      labels:
+        severity: warning
+        component: fraud-detection
+      annotations:
+        summary: "Unusually high betting activity detected"
+        description: "{{ $value }} bets per second in the last 5 minutes"
+
+    # Payment processing failures
+    - alert: PaymentProcessingFailures
+      expr: rate(mpesa_transaction_failures_total[5m]) > 10
+      for: 3m
+      labels:
+        severity: critical
+        component: payments
+      annotations:
+        summary: "High payment processing failure rate"
+        description: "{{ $value }} payment failures per second"
+
+    # Game crashes (technical issues, not game mechanic)
+    - alert: GameCrashErrors
+      expr: rate(game_engine_errors_total[5m]) > 1
+      for: 1m
+      labels:
+        severity: critical
+        component: game-engine
+      annotations:
+        summary: "Game engine errors detected"
+        description: "{{ $value }} game engine errors per second"
+
+    # Low user engagement
+    - alert: LowUserEngagement
+      expr: socket_connections_active < 10
+      for: 10m
+      labels:
+        severity: info
+        component: engagement
+      annotations:
+        summary: "Low user engagement detected"
+        description: "Only {{ $value }} active connections"
+
+  # ========================================
+  # SECURITY ALERTS
+  # ========================================
+  - name: stakeoutbet.security
+    rules:
+    # Too many failed login attempts
+    - alert: BruteForceAttempt
+      expr: rate(auth_login_failures_total[5m]) > 50
+      for: 2m
+      labels:
+        severity: warning
+        component: security
+      annotations:
+        summary: "Potential brute force attack detected"
+        description: "{{ $value }} failed login attempts per second"
+
+    # Unusual API request patterns
+    - alert: APIAbuseDetected
+      expr: rate(http_requests_total{job="stakeoutbet-backend"}[5m]) > 1000
+      for: 3m
+      labels:
+        severity: warning
+        component: security
+      annotations:
+        summary: "Unusually high API request rate"
+        description: "{{ $value }} requests per second from a single source"
+
+    # SSL certificate expiring
+    - alert: SSLCertificateExpiring
+      expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+      for: 0m
+      labels:
+        severity: warning
+        component: security
+      annotations:
+        summary: "SSL certificate expiring soon"
+        description: "SSL certificate expires in {{ $value | humanizeDuration }}"

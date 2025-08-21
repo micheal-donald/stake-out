@@ -1,0 +1,159 @@
+# ConfigMap for Stake Out Bet application configuration
+# Contains non-sensitive configuration data
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stakeoutbet-config
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: config
+data:
+  # Environment
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  
+  # Application ports
+  BACKEND_PORT: "4000"
+  FRONTEND_PORT: "80"
+  
+  # JWT configuration
+  JWT_EXPIRES_IN: "24h"
+  
+  # Redis configuration
+  REDIS_HOST: "stakeoutbet-redis-service"
+  REDIS_PORT: "6379"
+  
+  # Database configuration (connection details come from secrets)
+  DB_HOST: "stakeoutbet-postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "stakeoutbet_db"
+  
+  # M-Pesa configuration (non-sensitive)
+  MPESA_ENVIRONMENT: "production"
+  MPESA_BUSINESS_SHORT_CODE: "174379"
+  
+  # Performance tuning
+  NODE_OPTIONS: "--max-old-space-size=3072"
+  
+  # CORS configuration
+  FRONTEND_URL: "https://stakeoutbet.com"
+  
+  # Monitoring
+  HEALTH_CHECK_TIMEOUT: "10000"
+  
+---
+# ConfigMap for nginx configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stakeoutbet-nginx-config
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: frontend
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+        use epoll;
+        multi_accept on;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer-when-downgrade" always;
+        
+        # Performance
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        
+        # Gzip compression
+        gzip on;
+        gzip_vary on;
+        gzip_min_length 1024;
+        gzip_comp_level 6;
+        gzip_types
+            application/javascript
+            application/json
+            text/css
+            text/javascript
+            text/plain;
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        
+        # Hide nginx version
+        server_tokens off;
+        
+        include /etc/nginx/conf.d/*.conf;
+    }
+  
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+        root /usr/share/nginx/html;
+        index index.html;
+        
+        # Security headers
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        
+        # Static assets with long-term caching
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # API proxy
+        location /api/ {
+            limit_req zone=api burst=20 nodelay;
+            proxy_pass http://stakeoutbet-backend-service:4000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_cache_bypass $http_upgrade;
+        }
+        
+        # WebSocket proxy
+        location /socket.io/ {
+            proxy_pass http://stakeoutbet-backend-service:4000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_buffering off;
+        }
+        
+        # SPA fallback
+        location / {
+            try_files $uri $uri/ /index.html;
+            add_header Cache-Control "no-store, no-cache, must-revalidate";
+        }
+        
+        # Health check
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }

@@ -1,0 +1,198 @@
+# Kubernetes Ingress for Stake Out Bet Application
+# Provides external access with SSL termination and load balancing
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: stakeoutbet-ingress
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: ingress
+  annotations:
+    # Ingress controller specific annotations (NGINX example)
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    
+    # SSL configuration
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-rps: "10"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "Referrer-Policy: no-referrer-when-downgrade";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+    
+    # WebSocket support for Socket.IO
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+    nginx.ingress.kubernetes.io/server-snippets: |
+      location /socket.io/ {
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_http_version 1.1;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_buffering off;
+      }
+    
+    # Client body size for file uploads
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+    
+    # CORS headers for API requests
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://stakeoutbet.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+
+spec:
+  tls:
+  - hosts:
+    - stakeoutbet.com
+    - www.stakeoutbet.com
+    - api.stakeoutbet.com
+    secretName: stakeoutbet-tls
+  
+  rules:
+  # Main application domain
+  - host: stakeoutbet.com
+    http:
+      paths:
+      # API routes
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: stakeoutbet-backend-service
+            port:
+              number: 4000
+      
+      # Socket.IO WebSocket connections
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: stakeoutbet-backend-service
+            port:
+              number: 4000
+      
+      # Health check endpoint
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: stakeoutbet-frontend-service
+            port:
+              number: 80
+      
+      # Frontend routes (catch-all for SPA)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stakeoutbet-frontend-service
+            port:
+              number: 80
+  
+  # WWW redirect
+  - host: www.stakeoutbet.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stakeoutbet-frontend-service
+            port:
+              number: 80
+  
+  # API subdomain (alternative access)
+  - host: api.stakeoutbet.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: stakeoutbet-backend-service
+            port:
+              number: 4000
+
+---
+# Certificate Issuer for Let's Encrypt (cert-manager)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  namespace: stakeoutbet
+spec:
+  acme:
+    # Production Let's Encrypt server
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@stakeoutbet.com  # Replace with your email
+    
+    # Private key secret for ACME account
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    
+    # ACME challenge solver
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+    
+    # DNS challenge solver (alternative for wildcard certificates)
+    # - dns01:
+    #     cloudflare:
+    #       email: admin@stakeoutbet.com
+    #       apiKeySecretRef:
+    #         name: cloudflare-api-key
+    #         key: api-key
+
+---
+# Alternative: AWS ALB Ingress Configuration
+# Uncomment if using AWS Load Balancer Controller
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: stakeoutbet-alb-ingress
+#   namespace: stakeoutbet
+#   annotations:
+#     kubernetes.io/ingress.class: alb
+#     alb.ingress.kubernetes.io/scheme: internet-facing
+#     alb.ingress.kubernetes.io/target-type: ip
+#     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:region:account:certificate/cert-id
+#     alb.ingress.kubernetes.io/ssl-redirect: '443'
+#     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS":443}]'
+#     alb.ingress.kubernetes.io/healthcheck-path: /health
+#     alb.ingress.kubernetes.io/healthcheck-interval-seconds: '30'
+#     alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+#     alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+# spec:
+#   rules:
+#   - host: stakeoutbet.com
+#     http:
+#       paths:
+#       - path: /api
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: stakeoutbet-backend-service
+#             port:
+#               number: 4000
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: stakeoutbet-frontend-service
+#             port:
+#               number: 80

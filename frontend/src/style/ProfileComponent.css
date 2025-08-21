@@ -406,11 +406,11 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .profile-container {
-    padding: var(--space-md);
+    padding: var(--space-xs);
   }
   
   .profile-card {
-    padding: var(--space-lg);
+    padding: var(--space-sm);
   }
   
   .profile-header {

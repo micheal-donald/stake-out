@@ -1,0 +1,286 @@
+# Kubernetes Deployment for Redis Cache Service
+# Provides session storage and real-time game state caching
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stakeoutbet-redis
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: redis
+    app.kubernetes.io/version: "7.2"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Redis is stateful, use recreate strategy
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stakeoutbet
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stakeoutbet
+        app.kubernetes.io/component: redis
+        app.kubernetes.io/version: "7.2"
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+    spec:
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999  # redis user
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Service account
+      serviceAccountName: stakeoutbet-redis
+      
+      containers:
+      - name: redis
+        image: redis:7.2-alpine
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - name: redis
+          containerPort: 6379
+          protocol: TCP
+        
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        
+        # Resource limits and requests
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 100m
+            memory: 256Mi
+        
+        # Security context
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 999
+          capabilities:
+            drop:
+            - ALL
+        
+        # Volume mounts
+        volumeMounts:
+        - name: redis-config
+          mountPath: /etc/redis/redis.conf
+          subPath: redis.conf
+          readOnly: true
+        - name: redis-data
+          mountPath: /data
+        
+        # Health checks
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        # Startup probe
+        startupProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 6
+      
+      # Redis Exporter for Prometheus monitoring
+      - name: redis-exporter
+        image: oliver006/redis_exporter:latest
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - name: metrics
+          containerPort: 9121
+          protocol: TCP
+        
+        env:
+        - name: REDIS_ADDR
+          value: "redis://localhost:6379"
+        
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 59000
+          capabilities:
+            drop:
+            - ALL
+      
+      # Volumes
+      volumes:
+      - name: redis-config
+        configMap:
+          name: stakeoutbet-redis-config
+          items:
+          - key: redis.conf
+            path: redis.conf
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: stakeoutbet-redis-pvc
+      
+      # Termination grace period
+      terminationGracePeriodSeconds: 30
+      
+      # DNS policy
+      dnsPolicy: ClusterFirst
+      
+      # Restart policy
+      restartPolicy: Always
+
+---
+# Redis Configuration ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stakeoutbet-redis-config
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: redis
+data:
+  redis.conf: |
+    # Redis configuration for Stake Out Bet
+    
+    # Network
+    bind 0.0.0.0
+    port 6379
+    protected-mode no
+    tcp-keepalive 60
+    timeout 300
+    tcp-backlog 511
+    
+    # General
+    databases 2
+    save 900 1
+    save 300 10
+    save 60 10000
+    stop-writes-on-bgsave-error yes
+    
+    # Persistence
+    appendonly yes
+    appendfsync everysec
+    no-appendfsync-on-rewrite no
+    auto-aof-rewrite-percentage 100
+    auto-aof-rewrite-min-size 64mb
+    
+    # Memory management
+    maxmemory 1gb
+    maxmemory-policy allkeys-lru
+    maxmemory-samples 5
+    
+    # Logging
+    loglevel notice
+    
+    # Security (password will be set via environment if needed)
+    # requirepass your-password
+    
+    # Performance
+    hash-max-ziplist-entries 512
+    hash-max-ziplist-value 64
+    list-max-ziplist-size -2
+    list-compress-depth 0
+    set-max-intset-entries 512
+    zset-max-ziplist-entries 128
+    zset-max-ziplist-value 64
+    
+    # Slow log
+    slowlog-log-slower-than 10000
+    slowlog-max-len 128
+
+---
+# Service for Redis
+apiVersion: v1
+kind: Service
+metadata:
+  name: stakeoutbet-redis-service
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: redis
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9121"
+spec:
+  type: ClusterIP
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: redis
+    protocol: TCP
+  - name: metrics
+    port: 9121
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: redis
+  clusterIP: None  # Headless service for direct pod access
+
+---
+# PersistentVolumeClaim for Redis data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stakeoutbet-redis-pvc
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: redis
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: gp2  # AWS EBS gp2, adjust for your cloud provider
+
+---
+# Service Account for Redis
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: stakeoutbet-redis
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: redis
+automountServiceAccountToken: false

@@ -5,15 +5,22 @@ import { getDynamicColor, getGlowEffect } from '../utils/gameHelpers';
 const MultiplierDisplay = ({ multiplier, dangerLevel }) => {
   const [dynamicColor, setDynamicColor] = useState('');
   const [glowEffect, setGlowEffect] = useState('');
-  const [fontSize, setFontSize] = useState(36);
+  const [fontSize, setFontSize] = useState(2.5);
   const [shakeFactor, setShakeFactor] = useState(0);
   
   // Dynamic sizing and effects based on multiplier and danger level
   useEffect(() => {
-    // Base size calculation
-    const baseSize = 36;
-    const growthFactor = Math.min(1.8, 1 + (multiplier - 1) * 0.08); // Cap at 1.8x original size
-    setFontSize(baseSize * growthFactor);
+    const updateSize = () => {
+      // Use relative sizing instead of fixed pixels for better mobile responsiveness
+      const baseSize = window.innerWidth < 480 ? 1.8 : window.innerWidth < 768 ? 2 : 2.5; // rem units
+      const growthFactor = Math.min(1.8, 1 + (multiplier - 1) * 0.08); // Cap at 1.8x original size
+      setFontSize(baseSize * growthFactor);
+    };
+    
+    updateSize();
+    
+    // Listen for window resize to update size responsively
+    window.addEventListener('resize', updateSize);
     
     // Shake effect for extreme multipliers
     if (dangerLevel === 'extreme') {
@@ -23,6 +30,8 @@ const MultiplierDisplay = ({ multiplier, dangerLevel }) => {
     } else {
       setShakeFactor(0);
     }
+    
+    return () => window.removeEventListener('resize', updateSize);
   }, [multiplier, dangerLevel]);
   
   // Update dynamic color and glow effect with animation frame
@@ -68,7 +77,7 @@ const MultiplierDisplay = ({ multiplier, dangerLevel }) => {
         top: '50%',
         left: '50%',
         transform: `translate(-50%, -50%) translate(${shake.x}px, ${shake.y}px)`,
-        fontSize: `${fontSize}px`,
+        fontSize: `${fontSize}rem`,
         color: dynamicColor,
         textShadow: glowEffect,
         transition: 'font-size 0.2s ease-out'

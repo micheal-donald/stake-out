@@ -64,61 +64,99 @@ const BetHistoryComponent = () => {
   }
 
   return (
-    <div className="bet-history-container">
-      <h2>Betting History</h2>
+    <div className="battle-archives-container">
+      <div className="battle-archives-header">
+        <h2>
+          <span className="archives-icon">⚔️</span>
+          Battle Archives
+        </h2>
+        <p className="archives-subtitle">Combat History & Performance Metrics</p>
+      </div>
       
       {error && <div className="alert alert-danger">{error}</div>}
       
       {bets.length === 0 ? (
-        <div className="no-bets">
-          <p>You haven't placed any bets yet.</p>
+        <div className="no-battles">
+          <div className="empty-state-icon">🏟️</div>
+          <p>No combat records found, Commander.</p>
+          <p className="empty-subtext">Your battle history will appear here after your first deployment.</p>
         </div>
       ) : (
         <>
-          <div className="bet-table">
+          <div className="battle-stats-grid">
+            <div className="stat-card">
+              <div className="stat-icon">⚔️</div>
+              <div className="stat-value">{bets.length}</div>
+              <div className="stat-label">Total Sorties</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon">🏆</div>
+              <div className="stat-value">{bets.filter(bet => parseFloat(bet.winnings) > 0).length}</div>
+              <div className="stat-label">Victories</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon">💀</div>
+              <div className="stat-value">{bets.filter(bet => parseFloat(bet.winnings) === 0).length}</div>
+              <div className="stat-label">Defeats</div>
+            </div>
+          </div>
+
+          <div className="battle-table">
             <table>
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Bet Amount</th>
-                  <th>Multiplier</th>
-                  <th>Crash Point</th>
-                  <th>Winnings</th>
-                  <th>Type</th>
+                  <th><span className="table-icon">📅</span>Mission Date</th>
+                  <th><span className="table-icon">💰</span>Deployment</th>
+                  <th><span className="table-icon">📈</span>Combat Multi</th>
+                  <th><span className="table-icon">💥</span>Crash Point</th>
+                  <th><span className="table-icon">🎯</span>Spoils</th>
+                  <th><span className="table-icon">⚡</span>Type</th>
                 </tr>
               </thead>
               <tbody>
                 {bets.map(bet => (
-                  <tr key={bet.bet_id} className={parseFloat(bet.winnings) > 0 ? 'win' : 'loss'}>
+                  <tr key={bet.bet_id} className={parseFloat(bet.winnings) > 0 ? 'victory' : 'defeat'}>
                     <td>{formatDate(bet.created_at)}</td>
                     <td>${parseFloat(bet.bet_amount).toFixed(2)}</td>
                     <td>{parseFloat(bet.multiplier).toFixed(2)}x</td>
                     <td>{parseFloat(bet.crash_point).toFixed(2)}x</td>
-                    <td>${parseFloat(bet.winnings || 0).toFixed(2)}</td>
-                    <td>{bet.cashout_trigger === 'manual' ? 'Manual' : 'Auto'}</td>
+                    <td className="spoils-cell">
+                      <span className="spoils-amount">${parseFloat(bet.winnings || 0).toFixed(2)}</span>
+                      {parseFloat(bet.winnings) > 0 ? 
+                        <span className="victory-badge">🏆</span> : 
+                        <span className="defeat-badge">💀</span>
+                      }
+                    </td>
+                    <td>
+                      <span className={`battle-type ${bet.cashout_trigger}`}>
+                        {bet.cashout_trigger === 'manual' ? '⚡ Tactical' : '🤖 Auto-Pilot'}
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           
-          <div className="pagination">
+          <div className="archive-pagination">
             <button 
+              className="nav-btn prev-btn"
               onClick={() => handlePageChange(pagination.currentPage - 1)} 
               disabled={pagination.currentPage === 1}
             >
-              Previous
+              ◀️
             </button>
             
-            <span>
-              Page {pagination.currentPage} of {pagination.totalPages}
+            <span className="page-info">
+              {pagination.currentPage} / {pagination.totalPages}
             </span>
             
             <button 
+              className="nav-btn next-btn"
               onClick={() => handlePageChange(pagination.currentPage + 1)} 
               disabled={!pagination.hasMore}
             >
-              Next
+              ▶️
             </button>
           </div>
         </>

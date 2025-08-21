@@ -31,6 +31,28 @@
   flex-direction: column;
 }
 
+/* Progressive Enhancement for Tablets */
+@media (min-width: 768px) {
+  .game-container {
+    padding-bottom: 60px; /* Smaller bottom padding for tablets */
+  }
+  
+  .mobile-actions {
+    padding: var(--space-lg);
+  }
+  
+  .mobile-actions-content {
+    max-width: 600px;
+    gap: var(--space-md);
+  }
+  
+  .mobile-bet-input,
+  .mobile-action-btn {
+    min-height: 56px; /* Larger touch targets on tablets */
+    font-size: var(--font-xl);
+  }
+}
+
 /* Desktop Layout (Progressive Enhancement) */
 @media (min-width: 1024px) {
   .game-container {
@@ -40,7 +62,7 @@
   
   .game-area {
     width: 70%;
-    padding: var(--space-lg);
+    padding: var(--space-xl);
   }
   
   .community-area {
@@ -48,8 +70,42 @@
     background-color: var(--bg-secondary);
     border-left: 1px solid var(--border-color);
     border-top: none;
-    padding: var(--space-lg);
+    padding: var(--space-xl);
     max-height: none;
+  }
+  
+  /* Enhanced Desktop Controls */
+  .controls-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+    align-items: end;
+  }
+  
+  /* Desktop Hover Enhancements */
+  .game-canvas:hover {
+    border-color: var(--primary-color);
+    box-shadow: var(--glow-primary);
+    transition: all 0.3s ease;
+  }
+  
+  .multiplier-container:hover {
+    transform: scale(1.02);
+    transition: transform 0.3s ease;
+  }
+  
+  /* Enhanced Desktop Animations */
+  @keyframes desktop-glow-enhance {
+    0%, 100% {
+      box-shadow: var(--glow-primary);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(0, 209, 255, 0.8), 0 0 60px rgba(0, 209, 255, 0.4), 0 0 90px rgba(0, 209, 255, 0.2);
+    }
+  }
+  
+  .desktop-enhanced {
+    animation: desktop-glow-enhance 3s ease-in-out infinite;
   }
 }
 
@@ -217,15 +273,41 @@
   backdrop-filter: blur(2px);
 }
 
-/* Game Line Animation */
+/* Enhanced Neon Pulse Game Line Animation */
 .crash-line {
   position: absolute;
   bottom: 0;
   left: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--accent-green), var(--accent-yellow));
-  transition: width 0.1s linear;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+  height: 6px;
+  background: linear-gradient(90deg, var(--primary-color) 0%, var(--accent-green) 50%, var(--warning-color) 100%);
+  transition: width 0.05s linear;
+  box-shadow: var(--glow-primary);
+  border-radius: 3px;
+  animation: line-pulse 1s ease-in-out infinite alternate;
+}
+
+.crash-line.danger {
+  background: linear-gradient(90deg, var(--warning-color) 0%, var(--secondary-color) 100%);
+  box-shadow: var(--glow-warning);
+  animation: danger-line-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes line-pulse {
+  0% {
+    box-shadow: var(--glow-primary);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(0, 209, 255, 0.8), 0 0 30px rgba(0, 209, 255, 0.4);
+  }
+}
+
+@keyframes danger-line-pulse {
+  0%, 100% {
+    box-shadow: var(--glow-warning);
+  }
+  50% {
+    box-shadow: var(--glow-secondary);
+  }
 }
 
 /* Game Transitions */
@@ -250,20 +332,91 @@
   filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.5));
 }
 
-/* Game Animations */
+/* Enhanced Neon Pulse Game Animations */
 @keyframes game-pulse {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
   }
   50% {
-    opacity: 0.7;
-    transform: scale(1.05);
+    opacity: 0.8;
+    transform: scale(1.02);
   }
 }
 
 .game-pulse {
   animation: game-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Screen Flash Effects */
+@keyframes success-flash {
+  0% { background-color: transparent; }
+  50% { background-color: rgba(0, 255, 136, 0.15); }
+  100% { background-color: transparent; }
+}
+
+@keyframes crash-flash {
+  0% { background-color: transparent; }
+  25% { background-color: rgba(255, 59, 48, 0.3); }
+  50% { background-color: rgba(255, 59, 48, 0.1); }
+  75% { background-color: rgba(255, 59, 48, 0.2); }
+  100% { background-color: transparent; }
+}
+
+.success-flash {
+  animation: success-flash 1s ease-out;
+}
+
+.crash-flash {
+  animation: crash-flash 0.8s ease-out, crash-shake 0.5s ease-in-out;
+}
+
+/* Multiplier Growth Animation */
+@keyframes multiplier-grow {
+  0% {
+    transform: scale(1);
+    text-shadow: var(--glow-primary);
+  }
+  50% {
+    transform: scale(1.05);
+    text-shadow: 0 0 25px rgba(0, 209, 255, 0.8), 0 0 35px rgba(0, 209, 255, 0.5);
+  }
+  100% {
+    transform: scale(1.02);
+    text-shadow: 0 0 20px rgba(0, 209, 255, 0.7), 0 0 30px rgba(0, 209, 255, 0.4);
+  }
+}
+
+.multiplier-growing {
+  animation: multiplier-grow 0.3s ease-out;
+}
+
+/* Win Celebration Animation */
+@keyframes win-celebration {
+  0% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: var(--glow-success);
+  }
+  25% {
+    transform: scale(1.1) rotate(-5deg);
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.8);
+  }
+  50% {
+    transform: scale(1.15) rotate(5deg);
+    box-shadow: 0 0 40px rgba(0, 255, 136, 1);
+  }
+  75% {
+    transform: scale(1.1) rotate(-2deg);
+    box-shadow: 0 0 35px rgba(0, 255, 136, 0.9);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    box-shadow: var(--glow-success);
+  }
+}
+
+.win-celebration {
+  animation: win-celebration 1.5s ease-in-out;
 }
 
 /* Mobile-First Action Bar */
@@ -367,10 +520,11 @@
   box-shadow: var(--glow-primary);
 }
 
-.mobile-action-btn.btn-bet:hover:not(:disabled) {
+.mobile-action-btn.btn-bet:hover:not(:disabled),
+.mobile-action-btn.btn-bet:active:not(:disabled) {
   background: linear-gradient(135deg, #0099CC 0%, #007ACC 100%);
   box-shadow: 0 0 20px rgba(0, 209, 255, 0.6), 0 0 30px rgba(0, 209, 255, 0.4);
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(0.98);
 }
 
 .mobile-action-btn.btn-cashout {
@@ -381,10 +535,42 @@
   animation: neon-pulse 2s ease-in-out infinite;
 }
 
-.mobile-action-btn.btn-cashout:hover:not(:disabled) {
+.mobile-action-btn.btn-cashout:hover:not(:disabled),
+.mobile-action-btn.btn-cashout:active:not(:disabled) {
   background: linear-gradient(135deg, #CC0044 0%, #AA0033 100%);
   box-shadow: 0 0 20px rgba(255, 45, 117, 0.6), 0 0 30px rgba(255, 45, 117, 0.4);
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* Touch Feedback Animation */
+@keyframes touch-feedback {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(0, 209, 255, 0.7);
+  }
+  70% {
+    transform: scale(0.98);
+    box-shadow: 0 0 0 10px rgba(0, 209, 255, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(0, 209, 255, 0);
+  }
+}
+
+.touch-feedback {
+  animation: touch-feedback 0.6s ease-out;
+}
+
+/* Haptic Simulation via Visual Feedback */
+@keyframes haptic-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.haptic-feedback {
+  animation: haptic-pulse 0.1s ease-out;
 }
 
 .mobile-action-btn:disabled {
@@ -477,6 +663,57 @@
   50% {
     opacity: 0.6;
     transform: scale(1.2);
+  }
+}
+
+/* Mobile Performance Optimizations */
+.mobile-optimized {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+}
+
+/* Enhanced Touch States */
+.mobile-action-btn,
+.mobile-bet-input {
+  -webkit-tap-highlight-color: rgba(0, 209, 255, 0.2);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+/* Loading State Enhancements */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+  border: 2px solid var(--bg-tertiary);
+  border-top: 2px solid var(--primary-color);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  margin: 0 auto;
+}
+
+.loading-pulse {
+  animation: neon-pulse 1.5s ease-in-out infinite;
+}
+
+/* Reduced Motion Support for Performance */
+@media (prefers-reduced-motion: reduce) {
+  .multiplier-display,
+  .mobile-action-btn,
+  .crash-line,
+  .game-pulse {
+    animation: none !important;
+    transition: all 0.1s ease !important;
+  }
+  
+  .neon-pulse,
+  .danger-pulse,
+  .success-ripple,
+  .crash-shake {
+    animation: none !important;
   }
 }
 

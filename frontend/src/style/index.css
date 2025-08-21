@@ -1,32 +1,42 @@
-/* Gaming Dark Theme Design System */
+/* Import Google Fonts for Neon Pulse Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* Neon Pulse Gaming Theme Design System */
 :root {
-  /* Core Gaming Colors */
-  --primary-color: #3b82f6;        /* Blue for primary actions */
-  --secondary-color: #10b981;      /* Green for success/wins */
-  --danger-color: #ef4444;         /* Red for errors/losses */
-  --warning-color: #f59e0b;        /* Yellow for warnings */
+  /* Neon Pulse Core Colors */
+  --primary-color: #00D1FF;        /* Vibrant cyan for primary actions */
+  --secondary-color: #FF2D75;      /* Hot pink for critical actions */
+  --danger-color: #FF3B30;         /* Danger/loss states */
+  --warning-color: #FFD700;        /* High multiplier highlights */
   
-  /* Dark Theme Backgrounds */
-  --bg-primary: #0f172a;           /* Darkest background */
-  --bg-secondary: #1e293b;         /* Secondary background */
-  --bg-tertiary: #334155;          /* Tertiary background */
-  --bg-hover: #475569;             /* Hover state */
+  /* Neon Pulse Backgrounds */
+  --bg-primary: #0F0F1A;           /* Deep space black-blue */
+  --bg-secondary: #1A1A2E;         /* Surface/container color */
+  --bg-tertiary: #2A2A3E;          /* Elevated surfaces */
+  --bg-hover: #3A3A4E;             /* Hover state */
   
-  /* Text Colors */
-  --text-primary: #f1f5f9;         /* Primary text */
-  --text-secondary: #94a3b8;       /* Secondary text */
-  --text-muted: #64748b;           /* Muted text */
+  /* Neon Pulse Text Colors */
+  --text-primary: #FFFFFF;         /* Primary text */
+  --text-secondary: #A0A0B8;       /* Secondary text/labels */
+  --text-muted: #6A6A7A;           /* Muted text */
   
-  /* Gaming Accent Colors */
-  --accent-green: #22c55e;         /* Bright green for wins */
-  --accent-red: #ef4444;           /* Bright red for losses */
-  --accent-yellow: #eab308;        /* Gold for special states */
-  --accent-blue: #3b82f6;          /* Blue for info */
+  /* Neon Pulse Gaming Accent Colors */
+  --accent-green: #00FF88;         /* Success/win states */
+  --accent-red: #FF3B30;           /* Loss/crash states */
+  --accent-yellow: #FFD700;        /* Special highlights */
+  --accent-blue: #00D1FF;          /* Info/active states */
   
-  /* Component Colors */
-  --border-color: #475569;         /* Border color */
-  --card-bg: #1e293b;             /* Card backgrounds */
-  --input-bg: #334155;            /* Input backgrounds */
+  /* Neon Pulse Component Colors */
+  --border-color: #00D1FF33;       /* Semi-transparent cyan borders */
+  --card-bg: #1A1A2E;             /* Card backgrounds */
+  --input-bg: #2A2A3E;            /* Input backgrounds */
+  
+  /* Neon Glow Effects */
+  --glow-primary: 0 0 10px rgba(0, 209, 255, 0.5), 0 0 20px rgba(0, 209, 255, 0.3), 0 0 30px rgba(0, 209, 255, 0.2);
+  --glow-secondary: 0 0 10px rgba(255, 45, 117, 0.5), 0 0 20px rgba(255, 45, 117, 0.3);
+  --glow-success: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.3);
+  --glow-danger: 0 0 10px rgba(255, 59, 48, 0.5), 0 0 20px rgba(255, 59, 48, 0.3);
+  --glow-warning: 0 0 10px rgba(255, 215, 0, 0.5), 0 0 20px rgba(255, 215, 0, 0.3);
   
   /* Spacing Scale */
   --space-xs: 0.25rem;            /* 4px */
@@ -65,12 +75,17 @@
   }
   
   body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Inter', 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+  font-optical-sizing: auto;
   line-height: 1.6;
   background-color: var(--bg-primary);
   color: var(--text-primary);
   margin: 0;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: clamp(14px, 2.5vw, 16px); /* Responsive base font size */
 }
   
   .container {
@@ -735,6 +750,50 @@ a:hover {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+/* Neon Pulse Keyframe Animations */
+@keyframes neon-pulse {
+  0%, 100% {
+    text-shadow: var(--glow-primary);
+    box-shadow: var(--glow-primary);
+  }
+  50% {
+    text-shadow: 0 0 15px rgba(0, 209, 255, 0.8), 0 0 25px rgba(0, 209, 255, 0.5), 0 0 35px rgba(0, 209, 255, 0.3);
+    box-shadow: 0 0 15px rgba(0, 209, 255, 0.8), 0 0 25px rgba(0, 209, 255, 0.5);
+  }
+}
+
+@keyframes danger-pulse {
+  0%, 100% {
+    text-shadow: var(--glow-danger);
+    box-shadow: var(--glow-danger);
+  }
+  50% {
+    text-shadow: 0 0 15px rgba(255, 59, 48, 0.8), 0 0 25px rgba(255, 59, 48, 0.5);
+    box-shadow: 0 0 15px rgba(255, 59, 48, 0.8), 0 0 25px rgba(255, 59, 48, 0.5);
+  }
+}
+
+@keyframes success-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7);
+    transform: scale(1);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 255, 136, 0);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes crash-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
 }
 
 .loading {

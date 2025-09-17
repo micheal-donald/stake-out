@@ -7,8 +7,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "jest",
-    "test:unit": "jest --testPathPattern=tests/unit",
-    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:unit": "jest --testPathPattern=__tests__/database --testPathPattern=__tests__/events --testPathPattern=__tests__/providers",
+    "test:integration": "jest --testPathPattern=__tests__/api",
+    "test:runner": "node __tests__/setup/testRunner.js",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch",
     "lint": "eslint src/ tests/",
@@ -72,7 +73,8 @@
     "jsdoc": "^4.0.2",
     "nodemon": "^3.0.1",
     "prettier": "^3.1.0",
-    "supertest": "^6.3.3"
+    "supertest": "^6.3.3",
+    "lodash": "^4.17.21"
   },
   "jest": {
     "testEnvironment": "node",

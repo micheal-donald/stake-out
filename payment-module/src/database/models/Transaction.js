@@ -20,6 +20,7 @@
 
 const { dbConnection } = require('../connection');
 const PaymentError = require('../../errors/PaymentError');
+const { paymentEvents, PAYMENT_EVENTS } = require('../../events/PaymentEventEmitter');
 const logger = require('../../utils/logger');
 
 /**
@@ -153,6 +154,19 @@ class Transaction {
         amount: transaction.amount,
         currency: transaction.currency,
         reference: transaction.reference
+      });
+
+      // Emit transaction created event
+      paymentEvents.emitPaymentEvent(PAYMENT_EVENTS.TRANSACTION_CREATED, {
+        transactionId: transaction.id,
+        userId: transaction.userId,
+        providerType: transaction.providerType,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        status: transaction.status,
+        reference: transaction.reference,
+        description: transaction.description,
+        expiresAt: transaction.expiresAt
       });
 
       return transaction;
@@ -419,6 +433,19 @@ class Transaction {
         oldStatus,
         newStatus,
         userId: this.userId
+      });
+
+      // Emit transaction status changed event
+      paymentEvents.emitPaymentEvent(PAYMENT_EVENTS.TRANSACTION_STATUS_CHANGED, {
+        transactionId: this.id,
+        userId: this.userId,
+        oldStatus,
+        newStatus,
+        amount: this.amount,
+        currency: this.currency,
+        providerType: this.providerType,
+        reference: this.reference,
+        description: this.description
       });
 
       return true;

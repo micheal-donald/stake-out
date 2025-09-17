@@ -27,6 +27,7 @@ const crypto = require('crypto');
 const moment = require('moment');
 const PaymentProvider = require('../PaymentProvider');
 const PaymentError = require('../../errors/PaymentError');
+const { paymentEvents, PAYMENT_EVENTS } = require('../../events/PaymentEventEmitter');
 const logger = require('../../utils/logger');
 
 class MpesaProvider extends PaymentProvider {

@@ -43,7 +43,7 @@ class PaymentServer {
     this.server = null;
     this.isShuttingDown = false;
     this.config = {
-      port: config.port || process.env.PORT || 3001,
+      port: config.port || process.env.PORT || 3737,
       host: config.host || process.env.HOST || '0.0.0.0',
       env: config.env || process.env.NODE_ENV || 'development',
       corsOrigins: config.corsOrigins || process.env.CORS_ORIGINS?.split(',') || ['http://localhost:3000'],

@@ -58,7 +58,7 @@ The integration uses an adapter pattern to ensure seamless operation and gradual
 # Payment Module Integration
 USE_PAYMENT_MODULE=true                 # Enable payment module
 FALLBACK_TO_LEGACY=true                 # Enable legacy fallback
-PAYMENT_MODULE_URL=http://localhost:3001 # Payment module endpoint
+PAYMENT_MODULE_URL=http://localhost:3737 # Payment module endpoint
 PAYMENT_MODULE_API_KEY=your_api_key     # Authentication key
 PAYMENT_MODULE_TIMEOUT=30000            # Request timeout (ms)
 ```

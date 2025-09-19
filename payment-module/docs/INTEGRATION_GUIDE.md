@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-The server will start on `http://localhost:3001`
+The server will start on `http://localhost:3737`
 
 ### 2. Configure Environment
 
@@ -57,7 +57,7 @@ npm run migrate
 ### 4. Test API Connection
 
 ```bash
-curl http://localhost:3001/health
+curl http://localhost:3737/health
 ```
 
 ## Installation & Setup
@@ -111,7 +111,7 @@ curl http://localhost:3001/health
 
 2. **Run Container**
    ```bash
-   docker run -p 3001:3001 --env-file .env stakeout-payment-module
+   docker run -p 3737:3737 --env-file .env stakeout-payment-module
    ```
 
 ### Integration as Module
@@ -126,7 +126,7 @@ curl http://localhost:3001/health
    const { PaymentServer } = require('@stakeout/payment-module');
 
    const paymentServer = new PaymentServer({
-     port: 3001,
+     port: 3737,
      database: {
        url: process.env.DATABASE_URL
      },
@@ -336,7 +336,7 @@ function handlePaymentFailure(transaction) {
 
 3. **Test Configuration**
    ```bash
-   curl -X GET http://localhost:3001/api/payments/providers/mpesa/capabilities \
+   curl -X GET http://localhost:3737/api/payments/providers/mpesa/capabilities \
      -H "Authorization: Bearer ${TOKEN}"
    ```
 
@@ -383,7 +383,7 @@ Webhooks are crucial for receiving real-time payment status updates from provide
 
 2. **Expose Local Server**
    ```bash
-   ngrok http 3001
+   ngrok http 3737
    ```
 
 3. **Update Webhook URLs**
@@ -398,7 +398,7 @@ Webhooks are crucial for receiving real-time payment status updates from provide
    ```nginx
    # Nginx configuration
    location /api/webhooks/ {
-     proxy_pass http://localhost:3001;
+     proxy_pass http://localhost:3737;
      proxy_set_header Host $host;
      proxy_set_header X-Real-IP $remote_addr;
      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -591,7 +591,7 @@ sudo apt-get install apache2-utils
 # Test payment endpoint
 ab -n 1000 -c 10 -H "Authorization: Bearer ${TOKEN}" \
    -p payment.json -T application/json \
-   http://localhost:3001/api/payments/initiate
+   http://localhost:3737/api/payments/initiate
 ```
 
 ### Test Data
@@ -627,7 +627,7 @@ const testAmounts = {
 2. **Environment Variables**
    ```bash
    NODE_ENV=production
-   PORT=3001
+   PORT=3737
 
    # Database
    DATABASE_URL=postgresql://user:pass@prod-db:5432/payments
@@ -655,7 +655,7 @@ const testAmounts = {
    COPY src/ ./src/
    COPY docs/ ./docs/
 
-   EXPOSE 3001
+   EXPOSE 3737
    CMD ["npm", "start"]
    ```
 
@@ -666,7 +666,7 @@ const testAmounts = {
      payment-module:
        build: .
        ports:
-         - "3001:3001"
+         - "3737:3737"
        environment:
          - NODE_ENV=production
          - DATABASE_URL=postgresql://user:pass@db:5432/payments
@@ -707,7 +707,7 @@ spec:
       - name: payment-module
         image: stakeout/payment-module:latest
         ports:
-        - containerPort: 3001
+        - containerPort: 3737
         env:
         - name: DATABASE_URL
           valueFrom:
@@ -717,13 +717,13 @@ spec:
         readinessProbe:
           httpGet:
             path: /health/ready
-            port: 3001
+            port: 3737
           initialDelaySeconds: 30
           periodSeconds: 10
         livenessProbe:
           httpGet:
             path: /health/live
-            port: 3001
+            port: 3737
           initialDelaySeconds: 60
           periodSeconds: 30
 ```
@@ -733,13 +733,13 @@ spec:
 1. **Health Checks**
    ```bash
    # Basic health
-   curl http://localhost:3001/health
+   curl http://localhost:3737/health
 
    # Detailed readiness
-   curl http://localhost:3001/health/ready
+   curl http://localhost:3737/health/ready
 
    # System metrics
-   curl http://localhost:3001/health/metrics
+   curl http://localhost:3737/health/metrics
    ```
 
 2. **Log Aggregation**
@@ -763,7 +763,7 @@ spec:
 3. **Metrics Collection**
    ```bash
    # Prometheus metrics endpoint
-   curl http://localhost:3001/metrics
+   curl http://localhost:3737/metrics
    ```
 
 ## Examples
@@ -1053,7 +1053,7 @@ echo $MPESA_ENVIRONMENT
 
 3. **Test with ngrok** (development):
    ```bash
-   ngrok http 3001
+   ngrok http 3737
    # Update MPESA_CALLBACK_URL with ngrok URL
    ```
 
@@ -1127,18 +1127,18 @@ For additional support:
 
 2. **Health check endpoints**:
    ```bash
-   curl http://localhost:3001/health/ready
+   curl http://localhost:3737/health/ready
    ```
 
 3. **Provider capabilities**:
    ```bash
-   curl http://localhost:3001/api/payments/providers
+   curl http://localhost:3737/api/payments/providers
    ```
 
 4. **Test endpoints**:
    ```bash
    # Test M-Pesa connectivity
-   curl -X POST http://localhost:3001/api/webhooks/test \
+   curl -X POST http://localhost:3737/api/webhooks/test \
      -H "Content-Type: application/json" \
      -d '{"provider": "mpesa", "transactionId": "test", "status": "completed"}'
    ```

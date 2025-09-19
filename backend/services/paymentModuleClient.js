@@ -31,7 +31,7 @@ class PaymentModuleClient extends EventEmitter {
     super();
 
     this.config = {
-      baseUrl: config.baseUrl || process.env.PAYMENT_MODULE_URL || 'http://localhost:3001',
+      baseUrl: config.baseUrl || process.env.PAYMENT_MODULE_URL || 'http://localhost:3737',
       apiKey: config.apiKey || process.env.PAYMENT_MODULE_API_KEY,
       timeout: config.timeout || 30000,
       enableEvents: config.enableEvents !== false,

@@ -37,7 +37,7 @@ The main `start.sh` script has been enhanced to support the standalone payment m
 | Service | Port | URL | Description |
 |---------|------|-----|-------------|
 | 🎮 Frontend | 3000 | http://localhost:3000 | React application |
-| 💳 Payment Module | 3001 | http://localhost:3001 | Standalone payment service |
+| 💳 Payment Module | 3737 | http://localhost:3737 | Standalone payment service |
 | 🚀 Backend | 4000 | http://localhost:4000 | Main API server |
 | 📊 Database | 5432 | localhost:5432 | PostgreSQL database |
 | 🔧 Adminer | 8080 | http://localhost:8080 | Database admin UI |
@@ -45,7 +45,7 @@ The main `start.sh` script has been enhanced to support the standalone payment m
 ## Health Check URLs
 
 - **Backend Health**: http://localhost:4000/health
-- **Payment Module Health**: http://localhost:3001/health
+- **Payment Module Health**: http://localhost:3737/health
 - **Payment Integration**: http://localhost:4000/api/mpesa/health
 
 ## Startup Sequence
@@ -62,7 +62,7 @@ The main `start.sh` script has been enhanced to support the standalone payment m
 # Payment Integration
 USE_PAYMENT_MODULE=true
 FALLBACK_TO_LEGACY=true
-PAYMENT_MODULE_URL=http://localhost:3001
+PAYMENT_MODULE_URL=http://localhost:3737
 PAYMENT_MODULE_API_KEY=your_payment_api_key
 ```
 
@@ -72,7 +72,7 @@ PAYMENT_MODULE_API_KEY=your_payment_api_key
 DATABASE_URL=postgresql://user:pass@localhost:5432/stakeout_payment
 
 # Server
-PORT=3001
+PORT=3737
 NODE_ENV=development
 
 # Security
@@ -112,7 +112,7 @@ Starts services without database (requires external database)
 If ports are in use, the script will warn you:
 ```bash
 # Change default ports
-export PAYMENT_PORT=3002
+export PAYMENT_PORT=3738
 export BACKEND_PORT=4001
 ./start.sh
 ```
@@ -133,7 +133,7 @@ The script automatically:
 
 ### ✅ Healthy (All services operational)
 ```
-💳 Payment:   http://localhost:3001
+💳 Payment:   http://localhost:3737
 🚀 Backend:   http://localhost:4000
 🔗 Integration: http://localhost:4000/api/mpesa/health
 ```

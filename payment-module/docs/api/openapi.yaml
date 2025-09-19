@@ -1,0 +1,862 @@
+openapi: 3.0.3
+info:
+  title: StakeOut Payment Module API
+  description: |
+    Comprehensive payment processing API supporting multiple payment providers including M-Pesa, Stripe, and PayPal.
+
+    ## Features
+    - Multi-provider payment processing
+    - Real-time transaction status updates
+    - Comprehensive webhook handling
+    - Built-in security and rate limiting
+    - Detailed error reporting and logging
+
+    ## Authentication
+    All payment endpoints require JWT authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your-jwt-token>
+    ```
+
+    ## Rate Limiting
+    API requests are rate limited to prevent abuse:
+    - 100 requests per 15 minutes per IP address
+    - 1000 webhook requests per 5 minutes per provider
+
+    ## Error Handling
+    All errors follow a consistent format with detailed error codes and messages.
+
+    ## Supported Providers
+    - **M-Pesa**: Safaricom mobile money (Kenya)
+    - **Stripe**: Credit/debit cards (Global)
+    - **PayPal**: Digital wallet (Global)
+
+  version: 1.0.0
+  contact:
+    name: StakeOut Development Team
+    email: dev@stakeout.bet
+    url: https://stakeout.bet
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3001
+    description: Development server
+  - url: https://api.stakeout.bet/payments
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from authentication service
+
+  schemas:
+    # Core Models
+    Transaction:
+      type: object
+      required:
+        - id
+        - userId
+        - providerType
+        - amount
+        - currency
+        - status
+        - reference
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique transaction identifier
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        userId:
+          type: string
+          description: User identifier who initiated the transaction
+          example: "user_123456"
+        providerType:
+          type: string
+          enum: [mpesa, stripe, paypal]
+          description: Payment provider used for this transaction
+          example: "mpesa"
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          description: Transaction amount
+          example: 1000.00
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: ISO 4217 currency code
+          example: "KES"
+        status:
+          type: string
+          enum: [initiated, pending, completed, failed, cancelled, timeout]
+          description: Current transaction status
+          example: "completed"
+        reference:
+          type: string
+          description: Unique transaction reference
+          example: "REF_20240115_001"
+        description:
+          type: string
+          description: Transaction description
+          example: "Game credit purchase"
+        metadata:
+          type: object
+          description: Additional transaction metadata
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Transaction creation timestamp
+          example: "2024-01-15T10:30:00.000Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2024-01-15T10:35:00.000Z"
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Transaction expiration timestamp
+          example: "2024-01-15T11:30:00.000Z"
+        isExpired:
+          type: boolean
+          description: Whether the transaction has expired
+          example: false
+        isFinal:
+          type: boolean
+          description: Whether the transaction is in a final state
+          example: true
+
+    PaymentRequest:
+      type: object
+      required:
+        - amount
+        - currency
+        - provider
+      properties:
+        amount:
+          type: number
+          format: decimal
+          minimum: 0.01
+          maximum: 1000000
+          description: Payment amount
+          example: 1000.00
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          description: ISO 4217 currency code
+          example: "KES"
+        provider:
+          type: string
+          enum: [mpesa, stripe, paypal]
+          description: Payment provider to use
+          example: "mpesa"
+        phoneNumber:
+          type: string
+          pattern: "^254[0-9]{9}$"
+          description: Phone number for M-Pesa payments (required for mpesa)
+          example: "254708374149"
+        description:
+          type: string
+          maxLength: 200
+          description: Payment description
+          example: "Game credit purchase"
+        metadata:
+          type: object
+          description: Additional payment metadata
+          additionalProperties: true
+        callbackUrl:
+          type: string
+          format: uri
+          description: Custom callback URL for payment updates
+          example: "https://yourapp.com/payment-callback"
+
+    PaymentResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether the payment initiation was successful
+          example: true
+        transaction:
+          $ref: '#/components/schemas/Transaction'
+        providerResponse:
+          type: object
+          description: Provider-specific response data
+          properties:
+            transactionId:
+              type: string
+              description: Provider transaction identifier
+              example: "ws_CO_191220191020363925"
+            message:
+              type: string
+              description: Provider response message
+              example: "Success. Request accepted for processing"
+            requiresAction:
+              type: boolean
+              description: Whether user action is required
+              example: true
+            actionType:
+              type: string
+              enum: [stk_push, redirect, manual_confirmation]
+              description: Type of action required
+              example: "stk_push"
+        estimatedCompletionTime:
+          type: string
+          format: date-time
+          description: Estimated completion time
+          example: "2024-01-15T10:32:00.000Z"
+
+    ProviderCapabilities:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Provider internal name
+          example: "mpesa"
+        displayName:
+          type: string
+          description: Provider display name
+          example: "M-Pesa"
+        type:
+          type: string
+          enum: [mobile_money, card_payment, digital_wallet, bank_transfer]
+          description: Payment method type
+          example: "mobile_money"
+        supportedCurrencies:
+          type: array
+          items:
+            type: string
+            pattern: "^[A-Z]{3}$"
+          description: Supported currency codes
+          example: ["KES"]
+        supportedMethods:
+          type: array
+          items:
+            type: string
+          description: Supported payment methods
+          example: ["mobile_money"]
+        supportedCountries:
+          type: array
+          items:
+            type: string
+            pattern: "^[A-Z]{2}$"
+          description: Supported country codes
+          example: ["KE"]
+        isAvailable:
+          type: boolean
+          description: Whether provider is currently available
+          example: true
+        isImplemented:
+          type: boolean
+          description: Whether provider is fully implemented
+          example: true
+        limits:
+          type: object
+          properties:
+            min:
+              type: number
+              description: Minimum transaction amount
+              example: 1.00
+            max:
+              type: number
+              description: Maximum transaction amount
+              example: 300000.00
+            daily:
+              type: number
+              description: Daily transaction limit
+              example: 1000000.00
+        features:
+          type: array
+          items:
+            type: string
+          description: Supported features
+          example: ["instant_payment", "status_query", "refunds"]
+
+    # Response Wrappers
+    ApiResponse:
+      type: object
+      required:
+        - success
+        - timestamp
+      properties:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+        message:
+          type: string
+          description: Human-readable message
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp
+        requestId:
+          type: string
+          description: Unique request identifier for tracking
+
+    PaginatedResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            pagination:
+              type: object
+              properties:
+                currentPage:
+                  type: integer
+                  minimum: 1
+                  example: 1
+                totalPages:
+                  type: integer
+                  minimum: 0
+                  example: 5
+                totalCount:
+                  type: integer
+                  minimum: 0
+                  example: 42
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  example: 20
+                hasNext:
+                  type: boolean
+                  example: true
+                hasPrevious:
+                  type: boolean
+                  example: false
+
+    # Error Models
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          required:
+            - error
+          properties:
+            success:
+              type: boolean
+              enum: [false]
+            error:
+              type: string
+              description: Error type
+              example: "VALIDATION_ERROR"
+            code:
+              type: string
+              description: Specific error code
+              example: "INVALID_PHONE_NUMBER"
+            details:
+              type: object
+              description: Additional error details
+              additionalProperties: true
+
+    ValidationError:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    example: "phoneNumber"
+                  message:
+                    type: string
+                    example: "Phone number must be in format 254XXXXXXXXX"
+                  value:
+                    description: The invalid value provided
+
+    # Health and Monitoring
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, degraded]
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+        uptime:
+          type: number
+          description: System uptime in seconds
+          example: 86400
+        version:
+          type: string
+          example: "1.0.0"
+        responseTime:
+          type: number
+          description: Health check response time in milliseconds
+          example: 25
+
+    DetailedHealth:
+      allOf:
+        - $ref: '#/components/schemas/HealthStatus'
+        - type: object
+          properties:
+            services:
+              type: object
+              properties:
+                database:
+                  $ref: '#/components/schemas/ServiceHealth'
+                providers:
+                  $ref: '#/components/schemas/ServiceHealth'
+                migrations:
+                  $ref: '#/components/schemas/ServiceHealth'
+            metrics:
+              $ref: '#/components/schemas/SystemMetrics'
+
+    ServiceHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, degraded]
+        message:
+          type: string
+        responseTime:
+          type: number
+        details:
+          type: object
+          additionalProperties: true
+
+    SystemMetrics:
+      type: object
+      properties:
+        memory:
+          type: object
+          properties:
+            used:
+              type: number
+            total:
+              type: number
+            usage:
+              type: number
+        cpu:
+          type: object
+          properties:
+            user:
+              type: number
+            system:
+              type: number
+        process:
+          type: object
+          properties:
+            pid:
+              type: number
+            nodeVersion:
+              type: string
+            platform:
+              type: string
+
+paths:
+  # Payment Operations
+  /api/payments/initiate:
+    post:
+      summary: Initiate a payment
+      description: |
+        Initiate a new payment transaction with the specified provider.
+
+        **Important Notes:**
+        - For M-Pesa payments, phoneNumber is required
+        - Amount must be within provider limits
+        - User will receive provider-specific prompts (e.g., STK push for M-Pesa)
+
+      tags:
+        - Payments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+            examples:
+              mpesa_payment:
+                summary: M-Pesa Payment
+                value:
+                  amount: 1000
+                  currency: "KES"
+                  provider: "mpesa"
+                  phoneNumber: "254708374149"
+                  description: "Game credit purchase"
+              stripe_payment:
+                summary: Stripe Payment
+                value:
+                  amount: 50.00
+                  currency: "USD"
+                  provider: "stripe"
+                  description: "Premium subscription"
+      responses:
+        '201':
+          description: Payment initiated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments/{transactionId}:
+    get:
+      summary: Get transaction status
+      description: Retrieve the current status and details of a specific transaction
+      tags:
+        - Payments
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Transaction ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '200':
+          description: Transaction details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      transaction:
+                        $ref: '#/components/schemas/Transaction'
+        '404':
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/payments:
+    get:
+      summary: List user transactions
+      description: |
+        Retrieve a paginated list of transactions for the authenticated user.
+        Supports filtering by status, provider, and date range.
+      tags:
+        - Payments
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: Number of transactions per page
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [initiated, pending, completed, failed, cancelled, timeout]
+          description: Filter by transaction status
+        - name: provider
+          in: query
+          schema:
+            type: string
+            enum: [mpesa, stripe, paypal]
+          description: Filter by payment provider
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter transactions from this date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter transactions to this date
+      responses:
+        '200':
+          description: Transactions retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      transactions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Transaction'
+
+  /api/payments/{transactionId}/cancel:
+    post:
+      summary: Cancel a transaction
+      description: |
+        Cancel a pending transaction if cancellation is supported by the provider.
+        Only transactions in 'initiated' or 'pending' status can be cancelled.
+      tags:
+        - Payments
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Transaction ID to cancel
+      responses:
+        '200':
+          description: Transaction cancelled successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      transaction:
+                        $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Transaction cannot be cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Provider Information
+  /api/payments/providers:
+    get:
+      summary: List available payment providers
+      description: Get a list of all available payment providers with their capabilities
+      tags:
+        - Providers
+      security: []
+      responses:
+        '200':
+          description: Providers retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      providers:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProviderCapabilities'
+
+  /api/payments/providers/{provider}/capabilities:
+    get:
+      summary: Get provider capabilities
+      description: Get detailed capabilities and configuration for a specific provider
+      tags:
+        - Providers
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [mpesa, stripe, paypal]
+          description: Provider name
+      responses:
+        '200':
+          description: Provider capabilities retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      provider:
+                        $ref: '#/components/schemas/ProviderCapabilities'
+        '404':
+          description: Provider not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # Webhooks (Internal)
+  /api/webhooks/{provider}:
+    post:
+      summary: Process provider webhook
+      description: |
+        **Internal endpoint** - Called by payment providers to update transaction status.
+        This endpoint should not be called manually.
+      tags:
+        - Webhooks
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [mpesa, stripe, paypal]
+          description: Payment provider name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Provider-specific webhook payload
+      responses:
+        '200':
+          description: Webhook processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          description: Invalid webhook payload
+        '401':
+          description: Webhook signature verification failed
+
+  # Health Monitoring
+  /health:
+    get:
+      summary: Basic health check
+      description: Simple health check for load balancers and monitoring
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+  /health/ready:
+    get:
+      summary: Readiness probe
+      description: Comprehensive readiness check for orchestration systems
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealth'
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedHealth'
+
+  /health/live:
+    get:
+      summary: Liveness probe
+      description: Simple liveness check for process monitoring
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  alive:
+                    type: boolean
+                    example: true
+                  timestamp:
+                    type: string
+                    format: date-time
+                  pid:
+                    type: number
+                  uptime:
+                    type: number
+
+  /health/metrics:
+    get:
+      summary: System metrics
+      description: Detailed system performance metrics
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SystemMetrics'
+                  - type: object
+                    properties:
+                      timestamp:
+                        type: string
+                        format: date-time
+                      uptime:
+                        type: number
+                      loadAverage:
+                        type: array
+                        items:
+                          type: number
+
+tags:
+  - name: Payments
+    description: Core payment processing operations
+  - name: Providers
+    description: Payment provider information and capabilities
+  - name: Webhooks
+    description: Internal webhook endpoints for provider callbacks
+  - name: Health
+    description: System health and monitoring endpoints

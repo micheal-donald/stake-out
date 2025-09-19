@@ -47,10 +47,12 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
 DATABASE_DIR="$PROJECT_ROOT/database"
+PAYMENT_MODULE_DIR="$PROJECT_ROOT/payment-module"
 
 # Default configuration
 DEFAULT_BACKEND_PORT=4000
 DEFAULT_FRONTEND_PORT=3000
+DEFAULT_PAYMENT_PORT=3001
 DEFAULT_DB_PORT=5432
 DEFAULT_ADMINER_PORT=8080
 
@@ -173,6 +175,7 @@ load_environment() {
     # Set defaults if not specified
     export BACKEND_PORT=${BACKEND_PORT:-$DEFAULT_BACKEND_PORT}
     export FRONTEND_PORT=${FRONTEND_PORT:-$DEFAULT_FRONTEND_PORT}
+    export PAYMENT_PORT=${PAYMENT_PORT:-$DEFAULT_PAYMENT_PORT}
     export DB_PORT=${DB_PORT:-$DEFAULT_DB_PORT}
     export ADMINER_PORT=${ADMINER_PORT:-$DEFAULT_ADMINER_PORT}
     
@@ -204,7 +207,17 @@ install_dependencies() {
         print_error "Frontend package.json not found"
         exit 1
     fi
-    
+
+    # Payment module dependencies
+    if [ -f "$PAYMENT_MODULE_DIR/package.json" ]; then
+        print_info "Installing payment module dependencies..."
+        cd "$PAYMENT_MODULE_DIR"
+        npm install
+        print_success "Payment module dependencies installed"
+    else
+        print_warning "Payment module package.json not found - payment module will be unavailable"
+    fi
+
     cd "$PROJECT_ROOT"
 }
 
@@ -223,10 +236,17 @@ clean_install() {
         print_info "Removing frontend node_modules..."
         rm -rf "$FRONTEND_DIR/node_modules"
     fi
-    
+
+    # Remove payment module node_modules
+    if [ -d "$PAYMENT_MODULE_DIR/node_modules" ]; then
+        print_info "Removing payment module node_modules..."
+        rm -rf "$PAYMENT_MODULE_DIR/node_modules"
+    fi
+
     # Remove package-lock files
     [ -f "$BACKEND_DIR/package-lock.json" ] && rm "$BACKEND_DIR/package-lock.json"
     [ -f "$FRONTEND_DIR/package-lock.json" ] && rm "$FRONTEND_DIR/package-lock.json"
+    [ -f "$PAYMENT_MODULE_DIR/package-lock.json" ] && rm "$PAYMENT_MODULE_DIR/package-lock.json"
     
     print_success "Clean completed"
     
@@ -322,6 +342,73 @@ start_backend() {
     cd "$PROJECT_ROOT"
 }
 
+# Start payment module server
+start_payment_module() {
+    print_header "Starting Payment Module Server"
+
+    # Check if payment module exists
+    if [ ! -d "$PAYMENT_MODULE_DIR" ]; then
+        print_warning "Payment module directory not found - skipping payment module startup"
+        return 0
+    fi
+
+    if [ ! -f "$PAYMENT_MODULE_DIR/package.json" ]; then
+        print_warning "Payment module package.json not found - skipping payment module startup"
+        return 0
+    fi
+
+    cd "$PAYMENT_MODULE_DIR"
+
+    # Check if port is available
+    if ! port_available "$PAYMENT_PORT"; then
+        print_error "Payment module port $PAYMENT_PORT is already in use"
+        print_info "Please stop the service using this port or change PAYMENT_PORT"
+        print_warning "Continuing without payment module (backend will use legacy M-Pesa service)"
+        return 0
+    fi
+
+    print_info "Starting payment module server on port $PAYMENT_PORT..."
+
+    # Check if dependencies are installed
+    if [ ! -d "$PAYMENT_MODULE_DIR/node_modules" ]; then
+        print_info "Installing payment module dependencies..."
+        npm install
+    fi
+
+    # Start in development mode if not production
+    if [ "$PRODUCTION_MODE" = "true" ]; then
+        npm start &
+    else
+        npm run dev &
+    fi
+
+    PAYMENT_PID=$!
+
+    # Wait for payment module to be ready
+    if wait_for_service "localhost" "$PAYMENT_PORT" "Payment Module" 30; then
+        print_success "Payment module started (PID: $PAYMENT_PID)"
+        print_info "Payment Module API: http://localhost:$PAYMENT_PORT"
+        print_info "Payment Health: http://localhost:$PAYMENT_PORT/health"
+
+        # Test payment module health
+        if command_exists curl; then
+            sleep 2
+            if curl -s "http://localhost:$PAYMENT_PORT/health" >/dev/null 2>&1; then
+                print_success "Payment module health check passed"
+            else
+                print_warning "Payment module health check failed - service may still be starting"
+            fi
+        fi
+    else
+        print_warning "Payment module failed to start - backend will use legacy M-Pesa service"
+        if [ ! -z "$PAYMENT_PID" ]; then
+            kill "$PAYMENT_PID" 2>/dev/null || true
+        fi
+    fi
+
+    cd "$PROJECT_ROOT"
+}
+
 # Start frontend server
 start_frontend() {
     print_header "Starting Frontend Server"
@@ -371,23 +458,28 @@ show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  --setup     First-time setup (install dependencies, init database)"
-    echo "  --db-only   Start only database services"
-    echo "  --no-db     Skip database startup"
-    echo "  --prod      Start in production mode"
-    echo "  --clean     Clean install (remove node_modules and reinstall)"
-    echo "  --help      Show this help message"
+    echo "  --setup          First-time setup (install dependencies, init database)"
+    echo "  --db-only        Start only database services"
+    echo "  --no-db          Skip database startup"
+    echo "  --payment-only   Start only payment module"
+    echo "  --no-payment     Skip payment module startup"
+    echo "  --prod           Start in production mode"
+    echo "  --clean          Clean install (remove node_modules and reinstall)"
+    echo "  --help           Show this help message"
     echo ""
     echo "Environment Variables:"
-    echo "  BACKEND_PORT    Backend server port (default: $DEFAULT_BACKEND_PORT)"
-    echo "  FRONTEND_PORT   Frontend server port (default: $DEFAULT_FRONTEND_PORT)"
-    echo "  DB_PORT         Database port (default: $DEFAULT_DB_PORT)"
-    echo "  ADMINER_PORT    Adminer port (default: $DEFAULT_ADMINER_PORT)"
+    echo "  BACKEND_PORT     Backend server port (default: $DEFAULT_BACKEND_PORT)"
+    echo "  FRONTEND_PORT    Frontend server port (default: $DEFAULT_FRONTEND_PORT)"
+    echo "  PAYMENT_PORT     Payment module port (default: $DEFAULT_PAYMENT_PORT)"
+    echo "  DB_PORT          Database port (default: $DEFAULT_DB_PORT)"
+    echo "  ADMINER_PORT     Adminer port (default: $DEFAULT_ADMINER_PORT)"
     echo ""
     echo "Examples:"
     echo "  $0 --setup              # First-time setup"
-    echo "  $0                      # Normal startup"
+    echo "  $0                      # Normal startup (all services)"
     echo "  $0 --db-only            # Start only database"
+    echo "  $0 --payment-only       # Start only payment module"
+    echo "  $0 --no-payment         # Start without payment module"
     echo "  $0 --prod               # Production mode"
     echo "  $0 --clean              # Clean install and start"
 }
@@ -397,11 +489,16 @@ cleanup() {
     print_header "Cleaning Up"
     
     # Kill background processes
+    if [ ! -z "$PAYMENT_PID" ]; then
+        print_info "Stopping payment module..."
+        kill "$PAYMENT_PID" 2>/dev/null || true
+    fi
+
     if [ ! -z "$BACKEND_PID" ]; then
         print_info "Stopping backend server..."
         kill "$BACKEND_PID" 2>/dev/null || true
     fi
-    
+
     if [ ! -z "$FRONTEND_PID" ]; then
         print_info "Stopping frontend server..."
         kill "$FRONTEND_PID" 2>/dev/null || true
@@ -421,6 +518,8 @@ main() {
     SETUP_MODE=false
     DB_ONLY=false
     NO_DB=false
+    PAYMENT_ONLY=false
+    NO_PAYMENT=false
     PRODUCTION_MODE=false
     CLEAN_INSTALL=false
     
@@ -436,6 +535,14 @@ main() {
                 ;;
             --no-db)
                 NO_DB=true
+                shift
+                ;;
+            --payment-only)
+                PAYMENT_ONLY=true
+                shift
+                ;;
+            --no-payment)
+                NO_PAYMENT=true
                 shift
                 ;;
             --prod)
@@ -485,6 +592,25 @@ main() {
         wait
         exit 0
     fi
+
+    # Payment module only mode
+    if [ "$PAYMENT_ONLY" = true ]; then
+        # Start database if needed for payment module
+        if [ "$NO_DB" != true ]; then
+            start_database
+            run_migrations
+        fi
+
+        # Install payment module dependencies if needed
+        if [ ! -d "$PAYMENT_MODULE_DIR/node_modules" ]; then
+            install_dependencies
+        fi
+
+        start_payment_module
+        print_success "Payment module started. Press Ctrl+C to stop."
+        wait
+        exit 0
+    fi
     
     # Normal startup
     if [ "$NO_DB" != true ]; then
@@ -493,11 +619,22 @@ main() {
     fi
     
     # Install dependencies if node_modules don't exist
+    need_install=false
     if [ ! -d "$BACKEND_DIR/node_modules" ] || [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+        need_install=true
+    fi
+    if [ "$NO_PAYMENT" != true ] && [ ! -d "$PAYMENT_MODULE_DIR/node_modules" ]; then
+        need_install=true
+    fi
+
+    if [ "$need_install" = true ]; then
         install_dependencies
     fi
-    
+
     # Start application services
+    if [ "$NO_PAYMENT" != true ]; then
+        start_payment_module
+    fi
     start_backend
     start_frontend
     
@@ -510,9 +647,29 @@ main() {
         echo "  📊 Database:  http://localhost:$DB_PORT"
         echo "  🔧 Adminer:   http://localhost:$ADMINER_PORT"
     fi
+    if [ "$NO_PAYMENT" != true ] && [ ! -z "$PAYMENT_PID" ]; then
+        echo "  💳 Payment:   http://localhost:$PAYMENT_PORT"
+        echo "  🏥 Pay Health: http://localhost:$PAYMENT_PORT/health"
+    fi
     echo "  🚀 Backend:   http://localhost:$BACKEND_PORT"
+    if [ "$NO_PAYMENT" != true ]; then
+        echo "  🔗 Integration: http://localhost:$BACKEND_PORT/api/mpesa/health"
+    fi
     echo "  🎮 Frontend:  http://localhost:$FRONTEND_PORT"
     echo ""
+
+    # Test payment integration if available
+    if [ "$NO_PAYMENT" != true ] && [ ! -z "$PAYMENT_PID" ] && command_exists curl; then
+        print_info "Testing payment integration..."
+        sleep 3
+        if curl -s "http://localhost:$BACKEND_PORT/api/mpesa/health" >/dev/null 2>&1; then
+            print_success "Payment integration is working!"
+        else
+            print_warning "Payment integration test failed - backend may be using legacy mode"
+        fi
+        echo ""
+    fi
+
     print_info "Press Ctrl+C to stop all services"
     
     # Wait for user interrupt

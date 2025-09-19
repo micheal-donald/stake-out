@@ -2,8 +2,21 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middlewares/auth');
+const PaymentAdapter = require('../services/paymentAdapter');
 const mpesaService = require('../services/mpesa');
 const pool = require('../config/db');
+
+// Initialize payment adapter with configuration
+const paymentAdapter = new PaymentAdapter({
+  usePaymentModule: process.env.USE_PAYMENT_MODULE !== 'false',
+  fallbackToLegacy: process.env.FALLBACK_TO_LEGACY !== 'false',
+  legacyService: mpesaService,
+  paymentModule: {
+    baseUrl: process.env.PAYMENT_MODULE_URL,
+    apiKey: process.env.PAYMENT_MODULE_API_KEY,
+    timeout: parseInt(process.env.PAYMENT_MODULE_TIMEOUT) || 30000
+  }
+});
 
 // Initiate STK Push
 router.post('/stk-push', authenticateToken, async (req, res) => {
@@ -34,9 +47,9 @@ router.post('/stk-push', authenticateToken, async (req, res) => {
     // Generate a unique reference
     const accountReference = `STAKEOUT${userId}${Date.now().toString().slice(-6)}`;
     
-    // Initiate STK Push
-    const response = await mpesaService.initiateSTKPush(
-      phoneNumber, 
+    // Initiate STK Push via payment adapter
+    const response = await paymentAdapter.initiateSTKPush(
+      phoneNumber,
       numericAmount,
       accountReference
     );
@@ -48,8 +61,8 @@ router.post('/stk-push', authenticateToken, async (req, res) => {
       });
     }
     
-    // Save transaction record
-    const transactionId = await mpesaService.saveTransaction(
+    // Save transaction record via payment adapter
+    const transactionId = await paymentAdapter.saveTransaction(
       userId,
       response.CheckoutRequestID,
       numericAmount,
@@ -57,7 +70,7 @@ router.post('/stk-push', authenticateToken, async (req, res) => {
     );
     
     // Clean up any expired transactions
-    await mpesaService.cleanupExpiredTransactions();
+    await paymentAdapter.cleanupExpiredTransactions();
     
     res.json({
       success: true,
@@ -98,9 +111,9 @@ router.post('/callback', async (req, res) => {
       return responsePromise;
     }
     
-    // Process the callback asynchronously
+    // Process the callback asynchronously via payment adapter
     // This allows us to return 200 OK to M-Pesa immediately
-    mpesaService.processCallback(req.body)
+    paymentAdapter.processCallback(req.body)
       .then(result => {
         console.log('Callback processing result:', result);
       })
@@ -130,8 +143,8 @@ router.get('/transaction-status/:requestId', authenticateToken, async (req, res)
       return res.status(400).json({ error: 'Request ID is required' });
     }
     
-    // Query the M-Pesa API for status
-    const statusResponse = await mpesaService.querySTKStatus(requestId);
+    // Query the M-Pesa API for status via payment adapter
+    const statusResponse = await paymentAdapter.querySTKStatus(requestId);
     
     // Get updated transaction details from database after the query
     const result = await pool.query(
@@ -189,10 +202,10 @@ router.get('/pending-transactions', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     
     // First clean up any expired transactions
-    await mpesaService.cleanupExpiredTransactions();
-    
+    await paymentAdapter.cleanupExpiredTransactions();
+
     // Get pending transactions
-    const pendingTransactions = await mpesaService.getPendingTransactionsForUser(userId);
+    const pendingTransactions = await paymentAdapter.getPendingTransactionsForUser(userId);
     
     res.json({
       success: true,
@@ -216,8 +229,8 @@ router.post('/cancel-transaction/:transactionId', authenticateToken, async (req,
       return res.status(400).json({ error: 'Transaction ID is required' });
     }
     
-    // Cancel the transaction
-    const result = await mpesaService.cancelTransaction(parseInt(transactionId), userId);
+    // Cancel the transaction via payment adapter
+    const result = await paymentAdapter.cancelTransaction(parseInt(transactionId), userId);
     
     res.json({
       success: true,
@@ -267,7 +280,7 @@ router.get('/transaction/:id', authenticateToken, async (req, res) => {
     
     // If expired but not marked as timeout, update it
     if (isExpired && ['initiated', 'delivered'].includes(transaction.stk_status)) {
-      await mpesaService.cleanupExpiredTransactions();
+      await paymentAdapter.cleanupExpiredTransactions();
       
       // Fetch updated transaction details
       const updatedResult = await pool.query(
@@ -315,18 +328,18 @@ router.post('/check-pending', authenticateToken, async (req, res) => {
     const userId = req.user.userId;
     
     // First clean up expired transactions
-    await mpesaService.cleanupExpiredTransactions();
-    
+    await paymentAdapter.cleanupExpiredTransactions();
+
     // Get all pending transactions
-    const pendingTransactions = await mpesaService.getPendingTransactionsForUser(userId);
-    
+    const pendingTransactions = await paymentAdapter.getPendingTransactionsForUser(userId);
+
     // Check status for each transaction
     const results = [];
     for (const transaction of pendingTransactions) {
       try {
         if (new Date(transaction.expires_at) > new Date()) {
           // Only check unexpired transactions
-          const statusResponse = await mpesaService.querySTKStatus(transaction.checkout_request_id);
+          const statusResponse = await paymentAdapter.querySTKStatus(transaction.checkout_request_id);
           results.push({
             transactionId: transaction.transaction_id,
             status: transaction.stk_status,
@@ -351,6 +364,38 @@ router.post('/check-pending', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error checking pending transactions:', error);
     res.status(500).json({ error: 'Failed to check pending transactions' });
+  }
+});
+
+// Health check endpoint for payment services
+router.get('/health', async (req, res) => {
+  try {
+    const healthStatus = await paymentAdapter.getHealthStatus();
+
+    const status = healthStatus.paymentModule.available ? 'healthy' :
+                   (healthStatus.legacyService.available ? 'degraded' : 'unhealthy');
+
+    res.json({
+      status,
+      services: {
+        paymentModule: {
+          status: healthStatus.paymentModule.available ? 'online' : 'offline',
+          enabled: healthStatus.paymentModule.enabled
+        },
+        legacyMpesa: {
+          status: healthStatus.legacyService.available ? 'online' : 'offline',
+          enabled: healthStatus.legacyService.enabled
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Payment health check failed:', error);
+    res.status(500).json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 

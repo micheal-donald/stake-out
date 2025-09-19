@@ -5,18 +5,20 @@
 # =============================================================================
 # This script automates the setup and startup of the Stake Out Bet application
 # for development. It handles database initialization, dependency installation,
-# and starts both backend and frontend services.
+# and starts backend, frontend, and payment module services.
 #
 # Usage:
 #   ./start.sh [OPTIONS]
 #
 # Options:
-#   --setup     First-time setup (install dependencies, init database)
-#   --db-only   Start only database services
-#   --no-db     Skip database startup
-#   --prod      Start in production mode
-#   --clean     Clean install (remove node_modules and reinstall)
-#   --help      Show this help message
+#   --setup          First-time setup (install dependencies, init database)
+#   --db-only        Start only database services
+#   --no-db          Skip database startup
+#   --payment-only   Start only payment module
+#   --no-payment     Skip payment module startup
+#   --prod           Start in production mode
+#   --clean          Clean install (remove node_modules and reinstall)
+#   --help           Show this help message
 #
 # Requirements:
 #   - Docker and Docker Compose

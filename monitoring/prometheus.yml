@@ -1,0 +1,72 @@
+# Prometheus Configuration for StakeOut Bet
+# Monitoring configuration for Docker Compose deployment
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'stakeoutbet-monitor'
+
+rule_files:
+  - "alerts.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Backend API metrics
+  - job_name: 'stakeoutbet-backend'
+    static_configs:
+      - targets: ['backend:4000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    basic_auth:
+      username: 'prometheus'
+      password: 'monitoring_password'
+
+  # Payment Module metrics
+  - job_name: 'stakeoutbet-payment-module'
+    static_configs:
+      - targets: ['payment-module:3001']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    basic_auth:
+      username: 'prometheus'
+      password: 'monitoring_password'
+
+  # Redis metrics (via redis_exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # PostgreSQL metrics (via postgres_exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 30s
+
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:9113']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 30s

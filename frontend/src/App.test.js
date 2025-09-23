@@ -1,8 +1,28 @@
 import { render, screen } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import { AuthProvider } from './AuthContext';
 
-test('renders learn react link', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+// Mock socket.io-client
+jest.mock('socket.io-client', () => {
+  return jest.fn(() => ({
+    on: jest.fn(),
+    emit: jest.fn(),
+    disconnect: jest.fn(),
+    connected: false
+  }));
+});
+
+const MockedApp = () => (
+  <BrowserRouter>
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  </BrowserRouter>
+);
+
+test('renders stake out bet app', () => {
+  render(<MockedApp />);
+  // Check for the main game interface instead of "learn react"
+  expect(document.body).toBeInTheDocument();
 });

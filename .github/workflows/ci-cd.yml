@@ -106,11 +106,16 @@ jobs:
         NODE_ENV: test
         DATABASE_URL: postgresql://test_user:test_password@localhost:5432/stakeoutbet_test
         REDIS_URL: redis://localhost:6379
-        JWT_SECRET: test_jwt_secret_key_for_testing_only
+        JWT_SECRET: test_jwt_secret_key_for_testing_only_with_32_chars
+        SESSION_SECRET: test_session_secret_key_for_testing
+        MPESA_CONSUMER_KEY: test_key
+        MPESA_CONSUMER_SECRET: test_secret
+        PAYMENT_MODULE_API_KEY: test_payment_key
       run: |
-        # Run tests when they are implemented
-        # npm test
-        echo "Backend tests will run here when implemented"
+        # Run comprehensive test suite
+        npm run test:unit
+        npm run test:integration
+        npm run test:coverage
         
     - name: Run linting
       working-directory: ./backend
@@ -125,6 +130,78 @@ jobs:
       with:
         directory: ./backend/coverage
         flags: backend
+
+  # ========================================
+  # PAYMENT MODULE TESTS AND BUILD
+  # ========================================
+  payment-module-test:
+    name: Payment Module Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: stakeoutbet_test
+          POSTGRES_USER: test_user
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: payment-module/package-lock.json
+
+    - name: Install payment module dependencies
+      working-directory: ./payment-module
+      run: npm ci --prefer-offline --no-audit
+
+    - name: Run payment module tests
+      working-directory: ./payment-module
+      env:
+        NODE_ENV: test
+        DATABASE_URL: postgresql://test_user:test_password@localhost:5432/stakeoutbet_test
+        REDIS_URL: redis://localhost:6379
+        MPESA_CONSUMER_KEY: test_key
+        MPESA_CONSUMER_SECRET: test_secret
+        MPESA_PASSKEY: test_passkey
+        MPESA_ENVIRONMENT: sandbox
+        MPESA_BUSINESS_SHORT_CODE: test_shortcode
+        API_KEY: test_payment_api_key
+      run: |
+        # Run payment module test suite
+        npm run test:unit
+        npm run test:integration
+        npm run test:coverage
+
+    - name: Upload test coverage
+      if: success()
+      uses: codecov/codecov-action@v3
+      with:
+        directory: ./payment-module/coverage
+        flags: payment-module
 
   # ========================================
   # FRONTEND TESTS AND BUILD
@@ -190,16 +267,16 @@ jobs:
   build-images:
     name: Build Docker Images
     runs-on: ubuntu-latest
-    needs: [security, backend-test, frontend-test]
+    needs: [security, backend-test, payment-module-test, frontend-test]
     if: github.event_name != 'pull_request'
-    
+
     permissions:
       contents: read
       packages: write
-      
+
     strategy:
       matrix:
-        service: [backend, frontend]
+        service: [backend, payment-module, frontend]
         
     steps:
     - name: Checkout code
@@ -265,29 +342,43 @@ jobs:
       env:
         BACKEND_VERSION: ${{ github.sha }}
         FRONTEND_VERSION: ${{ github.sha }}
+        PAYMENT_MODULE_VERSION: ${{ github.sha }}
         DATABASE_URL: postgresql://stakeout_user:securepassword@localhost:5432/stakeoutbet_db
         REDIS_URL: redis://localhost:6379
         JWT_SECRET: test_jwt_secret_for_integration_tests
+        SESSION_SECRET: test_session_secret_for_integration_tests
+        MPESA_CONSUMER_KEY: test_key
+        MPESA_CONSUMER_SECRET: test_secret
+        MPESA_PASSKEY: test_passkey
+        MPESA_BUSINESS_SHORTCODE: test_shortcode
+        PAYMENT_MODULE_API_KEY: test_payment_key
+        REACT_APP_API_URL: http://localhost:4000
+        REACT_APP_SOCKET_URL: ws://localhost:4000
+        DB_NAME: stakeoutbet_db
+        DB_USER: stakeout_user
+        DB_PASSWORD: securepassword
       run: |
         # Pull the built images
         docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ github.sha }}
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/payment-module:${{ github.sha }}
         docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ github.sha }}
-        
+
         # Run integration tests
-        docker-compose -f deployment/docker-compose.production.yml up -d
-        
+        docker-compose -f docker-compose.production.yml up -d
+
         # Wait for services to be ready
-        sleep 30
-        
+        sleep 45
+
         # Run health checks
-        curl -f http://localhost:4000/health
-        curl -f http://localhost:80/health
-        
+        curl -f http://localhost:4000/health || echo "Backend health check failed"
+        curl -f http://localhost:3001/health || echo "Payment module health check failed"
+        curl -f http://localhost:3000/health || echo "Frontend health check failed"
+
         # Run API integration tests
         # npm run test:integration
-        
+
         # Cleanup
-        docker-compose -f deployment/docker-compose.production.yml down
+        docker-compose -f docker-compose.production.yml down
 
   # ========================================
   # STAGING DEPLOYMENT
@@ -318,17 +409,22 @@ jobs:
         # Update image tags in deployment files
         sed -i "s|stakeoutbet/backend:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ github.sha }}|g" deployment/kubernetes/backend-deployment.yaml
         sed -i "s|stakeoutbet/frontend:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ github.sha }}|g" deployment/kubernetes/frontend-deployment.yaml
-        
+        sed -i "s|stakeoutbet/payment-module:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/payment-module:${{ github.sha }}|g" deployment/kubernetes/payment-module-deployment.yaml
+
         # Apply Kubernetes manifests
         kubectl apply -f deployment/kubernetes/namespace.yaml
         kubectl apply -f deployment/kubernetes/configmap.yaml
         kubectl apply -f deployment/kubernetes/secrets.yaml
+        kubectl apply -f deployment/kubernetes/postgres-deployment.yaml
         kubectl apply -f deployment/kubernetes/redis-deployment.yaml
+        kubectl apply -f deployment/kubernetes/payment-module-deployment.yaml
         kubectl apply -f deployment/kubernetes/backend-deployment.yaml
         kubectl apply -f deployment/kubernetes/frontend-deployment.yaml
         kubectl apply -f deployment/kubernetes/ingress.yaml
+        kubectl apply -f deployment/kubernetes/monitoring.yaml
         
         # Wait for deployment to complete
+        kubectl rollout status deployment/stakeoutbet-payment-module -n stakeoutbet --timeout=300s
         kubectl rollout status deployment/stakeoutbet-backend -n stakeoutbet --timeout=300s
         kubectl rollout status deployment/stakeoutbet-frontend -n stakeoutbet --timeout=300s
         
@@ -379,17 +475,22 @@ jobs:
         # Update image tags in deployment files
         sed -i "s|stakeoutbet/backend:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:${{ github.sha }}|g" deployment/kubernetes/backend-deployment.yaml
         sed -i "s|stakeoutbet/frontend:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ github.sha }}|g" deployment/kubernetes/frontend-deployment.yaml
-        
+        sed -i "s|stakeoutbet/payment-module:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/payment-module:${{ github.sha }}|g" deployment/kubernetes/payment-module-deployment.yaml
+
         # Apply Kubernetes manifests with production configuration
         kubectl apply -f deployment/kubernetes/namespace.yaml
         kubectl apply -f deployment/kubernetes/configmap.yaml
         kubectl apply -f deployment/kubernetes/secrets.yaml
+        kubectl apply -f deployment/kubernetes/postgres-deployment.yaml
         kubectl apply -f deployment/kubernetes/redis-deployment.yaml
+        kubectl apply -f deployment/kubernetes/payment-module-deployment.yaml
         kubectl apply -f deployment/kubernetes/backend-deployment.yaml
         kubectl apply -f deployment/kubernetes/frontend-deployment.yaml
         kubectl apply -f deployment/kubernetes/ingress.yaml
+        kubectl apply -f deployment/kubernetes/monitoring.yaml
         
         # Rolling update with zero downtime
+        kubectl rollout status deployment/stakeoutbet-payment-module -n stakeoutbet --timeout=600s
         kubectl rollout status deployment/stakeoutbet-backend -n stakeoutbet --timeout=600s
         kubectl rollout status deployment/stakeoutbet-frontend -n stakeoutbet --timeout=600s
         

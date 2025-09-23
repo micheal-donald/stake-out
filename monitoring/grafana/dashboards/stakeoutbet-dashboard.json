@@ -1,0 +1,342 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "StakeOut Bet - Application Monitoring",
+    "tags": ["stakeoutbet", "gaming", "payments"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "type": "query",
+          "query": "label_values(up, instance)",
+          "current": {
+            "text": "All",
+            "value": "$__all"
+          },
+          "options": [],
+          "includeAll": true,
+          "allValue": ".*"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Overview",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+        "collapsed": false
+      },
+      {
+        "id": 2,
+        "title": "Active WebSocket Connections",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(websocket_connections_total{instance=~\"$instance\"})",
+            "legendFormat": "Active Connections",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 1},
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 100}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Game Rounds (Last Hour)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(game_rounds_total{instance=~\"$instance\"}[1h])",
+            "legendFormat": "Rounds",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 1}
+      },
+      {
+        "id": 4,
+        "title": "Total Bets (Last Hour)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "increase(bets_placed_total{instance=~\"$instance\"}[1h])",
+            "legendFormat": "Bets",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 1}
+      },
+      {
+        "id": 5,
+        "title": "Payment Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(sum(rate(payment_success_total{instance=~\"$instance\"}[5m])) / sum(rate(payment_attempts_total{instance=~\"$instance\"}[5m]))) * 100",
+            "legendFormat": "Success Rate %",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 1},
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": null},
+                {"color": "yellow", "value": 90},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Application Performance",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9},
+        "collapsed": false
+      },
+      {
+        "id": 7,
+        "title": "API Response Time (95th percentile)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "{{method}} {{route}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 10},
+        "yAxes": [
+          {
+            "unit": "s",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{instance=~\"$instance\"}[5m])) by (method, route)",
+            "legendFormat": "{{method}} {{route}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 10},
+        "yAxes": [
+          {
+            "unit": "reqps",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Game Metrics",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 18},
+        "collapsed": false
+      },
+      {
+        "id": 10,
+        "title": "Game Round Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(game_round_duration_seconds_bucket{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(game_round_duration_seconds_bucket{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "50th percentile",
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 19},
+        "yAxes": [
+          {
+            "unit": "s",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Active Game States",
+        "type": "pie",
+        "targets": [
+          {
+            "expr": "sum(game_state_total{instance=~\"$instance\"}) by (state)",
+            "legendFormat": "{{state}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 19}
+      },
+      {
+        "id": 12,
+        "title": "Payment Processing",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 27},
+        "collapsed": false
+      },
+      {
+        "id": 13,
+        "title": "M-Pesa Transaction Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mpesa_transactions_total{instance=~\"$instance\"}[5m])) by (status)",
+            "legendFormat": "{{status}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28}
+      },
+      {
+        "id": 14,
+        "title": "Payment Processing Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(payment_processing_duration_seconds_bucket{instance=~\"$instance\"}[5m]))",
+            "legendFormat": "95th percentile",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+        "yAxes": [
+          {
+            "unit": "s",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "System Resources",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 36},
+        "collapsed": false
+      },
+      {
+        "id": 16,
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total{instance=~\"$instance\"}[5m]) * 100",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 37},
+        "yAxes": [
+          {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes{instance=~\"$instance\"} / 1024 / 1024",
+            "legendFormat": "{{instance}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 37},
+        "yAxes": [
+          {
+            "unit": "MB",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "pg_stat_activity_count{instance=~\"$instance\"}",
+            "legendFormat": "Active Connections",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 37}
+      },
+      {
+        "id": 19,
+        "title": "Error Tracking",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 45},
+        "collapsed": false
+      },
+      {
+        "id": 20,
+        "title": "HTTP Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{instance=~\"$instance\",status_code=~\"4..|5..\"}[5m])) / sum(rate(http_requests_total{instance=~\"$instance\"}[5m])) * 100",
+            "legendFormat": "Error Rate %",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 46},
+        "yAxes": [
+          {
+            "unit": "percent",
+            "min": 0
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "title": "Application Errors",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(application_errors_total{instance=~\"$instance\"}[5m])",
+            "legendFormat": "{{type}}",
+            "refId": "A"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 46}
+      }
+    ]
+  }
+}

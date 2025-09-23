@@ -1,0 +1,299 @@
+# PostgreSQL Database Deployment for StakeOut Bet
+# Production-ready PostgreSQL with persistence and backup
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: stakeoutbet-postgres
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: database
+    app.kubernetes.io/version: "15"
+spec:
+  serviceName: stakeoutbet-postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: stakeoutbet
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: stakeoutbet
+        app.kubernetes.io/component: database
+        app.kubernetes.io/version: "15"
+    spec:
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        imagePullPolicy: IfNotPresent
+
+        ports:
+        - name: postgres
+          containerPort: 5432
+          protocol: TCP
+
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: stakeoutbet-config
+              key: DB_NAME
+
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: stakeoutbet-secrets
+              key: DB_USER
+
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: stakeoutbet-secrets
+              key: DB_PASSWORD
+
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+
+        # Performance tuning
+        - name: POSTGRES_SHARED_PRELOAD_LIBRARIES
+          value: "pg_stat_statements"
+
+        # Resource limits and requests
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+
+        # Volume mounts
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        - name: postgres-config
+          mountPath: /etc/postgresql/postgresql.conf
+          subPath: postgresql.conf
+
+        # Health checks
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - $(POSTGRES_USER)
+            - -d
+            - $(POSTGRES_DB)
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - $(POSTGRES_USER)
+            - -d
+            - $(POSTGRES_DB)
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+
+      volumes:
+      - name: postgres-config
+        configMap:
+          name: stakeoutbet-postgres-config
+
+  # Persistent volume claims
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "fast-ssd"
+      resources:
+        requests:
+          storage: 100Gi
+
+---
+# Service for PostgreSQL
+apiVersion: v1
+kind: Service
+metadata:
+  name: stakeoutbet-postgres-service
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: postgres
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: database
+
+---
+# PostgreSQL Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stakeoutbet-postgres-config
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: database
+data:
+  postgresql.conf: |
+    # PostgreSQL configuration for StakeOut Bet production
+
+    # Connection settings
+    listen_addresses = '*'
+    port = 5432
+    max_connections = 200
+
+    # Memory settings
+    shared_buffers = 1GB
+    effective_cache_size = 3GB
+    work_mem = 8MB
+    maintenance_work_mem = 256MB
+
+    # Write ahead log
+    wal_level = replica
+    max_wal_size = 2GB
+    min_wal_size = 100MB
+    checkpoint_completion_target = 0.9
+
+    # Logging
+    log_destination = 'stderr'
+    logging_collector = on
+    log_directory = 'pg_log'
+    log_filename = 'postgresql-%a.log'
+    log_truncate_on_rotation = on
+    log_rotation_age = 1d
+    log_min_duration_statement = 1000
+    log_line_prefix = '%m [%p] %u@%d '
+
+    # Performance monitoring
+    shared_preload_libraries = 'pg_stat_statements'
+    track_activity_query_size = 2048
+    pg_stat_statements.track = all
+
+    # Security
+    ssl = off  # Handled by ingress/service mesh
+
+    # Replication (for future read replicas)
+    hot_standby = on
+
+    # Vacuum and analyze
+    autovacuum = on
+    autovacuum_max_workers = 3
+    autovacuum_naptime = 20s
+
+---
+# Backup CronJob for PostgreSQL
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: stakeoutbet-postgres-backup
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  timeZone: "UTC"
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: stakeoutbet
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: postgres-backup
+            image: postgres:15-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              BACKUP_FILE="/backups/stakeoutbet_$(date +%Y%m%d_%H%M%S).sql"
+              echo "Starting backup to $BACKUP_FILE"
+              pg_dump $DATABASE_URL > $BACKUP_FILE
+              gzip $BACKUP_FILE
+              echo "Backup completed: ${BACKUP_FILE}.gz"
+
+              # Cleanup old backups (keep 30 days)
+              find /backups -name "*.sql.gz" -mtime +30 -delete
+              echo "Old backups cleaned up"
+
+              # Upload to S3 if configured
+              if [ -n "$AWS_ACCESS_KEY_ID" ]; then
+                aws s3 cp ${BACKUP_FILE}.gz s3://$S3_BUCKET/$(basename ${BACKUP_FILE}.gz)
+                echo "Backup uploaded to S3"
+              fi
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: stakeoutbet-secrets
+                  key: DATABASE_URL
+            - name: S3_BUCKET
+              value: "stakeoutbet-backups"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: secret-access-key
+                  optional: true
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: postgres-backup-pvc
+
+---
+# PVC for backup storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-backup-pvc
+  namespace: stakeoutbet
+  labels:
+    app.kubernetes.io/name: stakeoutbet
+    app.kubernetes.io/component: backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: "standard"
+  resources:
+    requests:
+      storage: 50Gi

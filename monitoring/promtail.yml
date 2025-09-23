@@ -1,0 +1,112 @@
+# Promtail Configuration for StakeOut Bet Log Shipping
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Backend application logs
+  - job_name: stakeoutbet-backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: stakeoutbet-backend
+          service: backend
+          environment: production
+          __path__: /var/log/backend/*.log
+
+  # Payment module logs
+  - job_name: stakeoutbet-payment-module
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: stakeoutbet-payment-module
+          service: payment-module
+          environment: production
+          __path__: /var/log/payment/*.log
+
+  # Nginx access and error logs
+  - job_name: nginx-access
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          service: nginx
+          log_type: access
+          environment: production
+          __path__: /var/log/nginx/access.log
+
+  - job_name: nginx-error
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          service: nginx
+          log_type: error
+          environment: production
+          __path__: /var/log/nginx/error.log
+
+  # System logs (if available)
+  - job_name: syslog
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          service: system
+          environment: production
+          __path__: /var/log/syslog
+
+pipeline_stages:
+  # Parse JSON logs from Node.js applications
+  - match:
+      selector: '{service=~"backend|payment-module"}'
+      stages:
+        - json:
+            expressions:
+              timestamp: timestamp
+              level: level
+              message: message
+              module: module
+              userId: userId
+              requestId: requestId
+        - timestamp:
+            source: timestamp
+            format: RFC3339
+        - labels:
+            level:
+            module:
+        - output:
+            source: message
+
+  # Parse Nginx logs
+  - match:
+      selector: '{service="nginx",log_type="access"}'
+      stages:
+        - regex:
+            expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"'
+        - labels:
+            method:
+            status:
+            path:
+        - timestamp:
+            source: time_local
+            format: 02/Jan/2006:15:04:05 -0700
+
+  # Parse error logs with multiline support
+  - match:
+      selector: '{log_type="error"}'
+      stages:
+        - multiline:
+            firstline: '^\d{4}-\d{2}-\d{2}'
+            max_wait_time: 3s

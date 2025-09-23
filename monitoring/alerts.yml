@@ -1,0 +1,191 @@
+# Prometheus Alerting Rules for StakeOut Bet
+
+groups:
+  - name: stakeoutbet-application-alerts
+    rules:
+      # Application availability
+      - alert: ApplicationDown
+        expr: up{job=~"stakeoutbet-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "StakeOut Bet service is down"
+          description: "{{ $labels.job }} has been down for more than 2 minutes"
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{job=~"stakeoutbet-.*",status_code=~"5.."}[5m])) by (job)
+            /
+            sum(rate(http_requests_total{job=~"stakeoutbet-.*"}[5m])) by (job)
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High error rate detected"
+          description: "{{ $labels.job }} has error rate above 5% for more than 5 minutes"
+
+      # High response time
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket{job=~"stakeoutbet-.*"}[5m])) by (le, job)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High response time detected"
+          description: "{{ $labels.job }} 95th percentile response time is above 2s for more than 5 minutes"
+
+  - name: stakeoutbet-game-alerts
+    rules:
+      # No active WebSocket connections
+      - alert: NoActiveConnections
+        expr: sum(websocket_connections_total) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No active WebSocket connections"
+          description: "No users are connected to the game for more than 5 minutes"
+
+      # Game engine stopped
+      - alert: GameEngineInactive
+        expr: increase(game_rounds_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Game engine appears to be inactive"
+          description: "No new game rounds have been created in the last 10 minutes"
+
+      # High game round duration
+      - alert: SlowGameRounds
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(game_round_duration_seconds_bucket[5m])) by (le)
+          ) > 60
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Game rounds taking too long"
+          description: "95th percentile game round duration is above 60 seconds"
+
+  - name: stakeoutbet-payment-alerts
+    rules:
+      # Payment processing failures
+      - alert: PaymentFailureRate
+        expr: |
+          (
+            sum(rate(payment_attempts_total{status="failed"}[5m]))
+            /
+            sum(rate(payment_attempts_total[5m]))
+          ) * 100 > 10
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High payment failure rate"
+          description: "Payment failure rate is above 10% for more than 3 minutes"
+
+      # M-Pesa API issues
+      - alert: MpesaApiErrors
+        expr: rate(mpesa_api_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "M-Pesa API errors detected"
+          description: "M-Pesa API error rate is above 0.1 errors/second"
+
+      # Payment processing delays
+      - alert: SlowPaymentProcessing
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(payment_processing_duration_seconds_bucket[5m])) by (le)
+          ) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow payment processing"
+          description: "95th percentile payment processing time is above 30 seconds"
+
+  - name: stakeoutbet-infrastructure-alerts
+    rules:
+      # High CPU usage
+      - alert: HighCpuUsage
+        expr: rate(process_cpu_seconds_total[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High CPU usage detected"
+          description: "{{ $labels.job }} CPU usage is above 80% for more than 5 minutes"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / (1024^3)) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "High memory usage detected"
+          description: "{{ $labels.job }} memory usage is above 1GB"
+
+      # Database connection issues
+      - alert: HighDatabaseConnections
+        expr: pg_stat_activity_count > 150
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connection count"
+          description: "PostgreSQL has more than 150 active connections for more than 5 minutes"
+
+      # Redis connection issues
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis server is not responding"
+
+  - name: stakeoutbet-business-alerts
+    rules:
+      # Unusual betting patterns
+      - alert: UnusualBettingVolume
+        expr: |
+          (
+            rate(bets_placed_total[5m])
+            >
+            (avg_over_time(rate(bets_placed_total[5m])[1h:5m]) * 3)
+          )
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual betting volume detected"
+          description: "Current betting rate is 3x higher than the hourly average"
+
+      # Low betting activity
+      - alert: LowBettingActivity
+        expr: rate(bets_placed_total[10m]) < 0.1
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low betting activity"
+          description: "Betting rate is below 0.1 bets/second for more than 30 minutes"

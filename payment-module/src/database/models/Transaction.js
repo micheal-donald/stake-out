@@ -61,7 +61,8 @@ class Transaction {
   constructor(data = {}) {
     this.id = data.id || data.transaction_id;
     this.userId = data.user_id || data.userId;
-    this.transactionType = data.transaction_type || data.transactionType || data.providerType;
+    this.transactionType = data.transaction_type || data.transactionType;
+    this.providerType = data.provider_type || data.providerType;
     this.amount = data.amount;
     this.status = data.status || TRANSACTION_STATUSES.PENDING;
     this.reference = data.reference_id || data.reference;
@@ -87,7 +88,7 @@ class Transaction {
   static async create(transactionData) {
     try {
       // Validate required fields
-      const requiredFields = ['userId', 'providerType', 'amount', 'reference'];
+      const requiredFields = ['userId', 'transactionType', 'amount'];
       const missingFields = requiredFields.filter(field => !transactionData[field]);
 
       if (missingFields.length > 0) {
@@ -124,7 +125,7 @@ class Transaction {
 
       const values = [
         transactionData.userId,
-        transactionData.providerType,
+        transactionData.transactionType || transactionData.providerType, // Use transactionType if provided, otherwise fallback to providerType
         transactionData.amount,
         TRANSACTION_STATUSES.PENDING,
         transactionData.reference || null,
@@ -290,7 +291,7 @@ class Transaction {
       }
 
       if (provider) {
-        whereConditions.push(`provider_type = $${paramIndex}`);
+        whereConditions.push(`transaction_type = $${paramIndex}`); // Changed from provider_type to transaction_type
         values.push(provider);
         paramIndex++;
       }

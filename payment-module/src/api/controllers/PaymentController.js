@@ -65,6 +65,7 @@ class PaymentController {
       const transactionData = {
         userId: user?.userId || metadata?.userId,
         providerType: provider,
+        transactionType: 'deposit', // Added correct transaction type for the database
         amount: parseFloat(amount),
         currency: currency || 'KES',
         reference: reference || `STK${Date.now()}${user?.userId || metadata?.userId || '000'}`,

@@ -139,7 +139,7 @@ const logger = require('../../utils/logger');
  *           example: "ws_CO_123456789"
  *         status:
  *           type: string
- *           enum: [initiated, pending, completed, failed, cancelled, timeout]
+ *           enum: [pending, completed, failed]
  *           example: "completed"
  *         message:
  *           type: string
@@ -262,7 +262,7 @@ const transactionHistoryValidation = [
 
   query('status')
     .optional()
-    .isIn(['initiated', 'pending', 'completed', 'failed', 'cancelled', 'timeout'])
+    .isIn(['pending', 'completed', 'failed'])
     .withMessage('Status must be a valid payment status'),
 
   query('provider')
@@ -337,7 +337,7 @@ const transactionHistoryValidation = [
  */
 router.post('/initiate',
   rateLimitMiddleware.payment,
-  authMiddleware.authenticate,
+  authMiddleware.authenticateApiKey,
   paymentInitiationValidation,
   validationMiddleware.handleValidationErrors,
   async (req, res) => {
@@ -349,7 +349,9 @@ router.post('/initiate',
     });
 
     try {
-      const result = await PaymentController.initiatePayment(req.body, req.user);
+      // For API key authentication, user info comes from request body metadata
+      const user = req.user || (req.body.metadata ? { userId: req.body.metadata.userId } : null);
+      const result = await PaymentController.initiatePayment(req.body, user);
 
       logger.endOperation(operationContext, true, {
         transactionId: result.transactionId,
@@ -608,7 +610,7 @@ router.get('/history',
  *     summary: Cancel a pending payment
  *     description: |
  *       Attempts to cancel a payment transaction that is still in progress.
- *       Only transactions in 'initiated' or 'pending' status can be cancelled.
+ *       Only transactions in 'pending' status can be cancelled.
  *     tags:
  *       - Payments
  *     security:

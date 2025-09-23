@@ -357,7 +357,7 @@ class PaymentServer {
 
     // Handle uncaught exceptions
     process.on('uncaughtException', (error) => {
-      logger.fatal('Uncaught Exception', {
+      logger.error('Uncaught Exception', {
         error: error.message,
         stack: error.stack
       });
@@ -532,7 +532,7 @@ class PaymentServer {
         });
 
         if (error.code === 'EADDRINUSE') {
-          logger.fatal(`Port ${this.config.port} is already in use`);
+          logger.error(`Port ${this.config.port} is already in use`);
           process.exit(1);
         }
       });
@@ -548,7 +548,7 @@ class PaymentServer {
       });
 
     } catch (error) {
-      logger.fatal('Failed to start payment server', {
+      logger.error('Failed to start payment server', {
         error: error.message,
         stack: error.stack
       });

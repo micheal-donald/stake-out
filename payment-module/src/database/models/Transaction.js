@@ -27,35 +27,31 @@ const logger = require('../../utils/logger');
  * Valid transaction statuses and their allowed transitions
  */
 const TRANSACTION_STATUSES = {
-  INITIATED: 'initiated',
   PENDING: 'pending',
   COMPLETED: 'completed',
-  FAILED: 'failed',
-  CANCELLED: 'cancelled',
-  TIMEOUT: 'timeout'
+  FAILED: 'failed'
+};
+
+/**
+ * Valid transaction types
+ */
+const TRANSACTION_TYPES = {
+  DEPOSIT: 'deposit',
+  WITHDRAWAL: 'withdrawal',
+  BET: 'bet',
+  WIN: 'win'
 };
 
 /**
  * Valid status transitions
  */
 const STATUS_TRANSITIONS = {
-  [TRANSACTION_STATUSES.INITIATED]: [
-    TRANSACTION_STATUSES.PENDING,
-    TRANSACTION_STATUSES.COMPLETED,
-    TRANSACTION_STATUSES.FAILED,
-    TRANSACTION_STATUSES.CANCELLED,
-    TRANSACTION_STATUSES.TIMEOUT
-  ],
   [TRANSACTION_STATUSES.PENDING]: [
     TRANSACTION_STATUSES.COMPLETED,
-    TRANSACTION_STATUSES.FAILED,
-    TRANSACTION_STATUSES.CANCELLED,
-    TRANSACTION_STATUSES.TIMEOUT
+    TRANSACTION_STATUSES.FAILED
   ],
   [TRANSACTION_STATUSES.COMPLETED]: [], // Final status
-  [TRANSACTION_STATUSES.FAILED]: [], // Final status
-  [TRANSACTION_STATUSES.CANCELLED]: [], // Final status
-  [TRANSACTION_STATUSES.TIMEOUT]: [] // Final status
+  [TRANSACTION_STATUSES.FAILED]: [] // Final status
 };
 
 /**
@@ -63,18 +59,15 @@ const STATUS_TRANSITIONS = {
  */
 class Transaction {
   constructor(data = {}) {
-    this.id = data.id;
+    this.id = data.id || data.transaction_id;
     this.userId = data.user_id || data.userId;
-    this.providerType = data.provider_type || data.providerType;
+    this.transactionType = data.transaction_type || data.transactionType || data.providerType;
     this.amount = data.amount;
-    this.currency = data.currency || 'KES';
-    this.status = data.status || TRANSACTION_STATUSES.INITIATED;
-    this.reference = data.reference;
+    this.status = data.status || TRANSACTION_STATUSES.PENDING;
+    this.reference = data.reference_id || data.reference;
     this.description = data.description;
-    this.metadata = data.metadata || {};
     this.createdAt = data.created_at || data.createdAt;
     this.updatedAt = data.updated_at || data.updatedAt;
-    this.expiresAt = data.expires_at || data.expiresAt;
   }
 
   /**
@@ -86,11 +79,8 @@ class Transaction {
    * @param {string} transactionData.userId - User ID
    * @param {string} transactionData.providerType - Payment provider
    * @param {number} transactionData.amount - Transaction amount
-   * @param {string} transactionData.currency - Currency code
    * @param {string} transactionData.reference - Unique reference
    * @param {string} [transactionData.description] - Description
-   * @param {Object} [transactionData.metadata] - Additional metadata
-   * @param {Date} [transactionData.expiresAt] - Expiration time
    * @returns {Promise<Transaction>} Created transaction
    * @throws {PaymentError} If creation fails
    */
@@ -125,10 +115,10 @@ class Transaction {
 
       const query = `
         INSERT INTO transactions (
-          user_id, provider_type, amount, currency, reference,
-          description, metadata, expires_at, status, created_at, updated_at
+          user_id, transaction_type, amount, status,
+          reference_id, description, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
         RETURNING *
       `;
 
@@ -136,12 +126,9 @@ class Transaction {
         transactionData.userId,
         transactionData.providerType,
         transactionData.amount,
-        transactionData.currency || 'KES',
-        transactionData.reference,
-        transactionData.description || null,
-        JSON.stringify(transactionData.metadata || {}),
-        transactionData.expiresAt || null,
-        TRANSACTION_STATUSES.INITIATED
+        TRANSACTION_STATUSES.PENDING,
+        transactionData.reference || null,
+        transactionData.description || null
       ];
 
       const result = await dbConnection.query(query, values);
@@ -150,9 +137,8 @@ class Transaction {
       logger.info('Transaction created successfully', {
         transactionId: transaction.id,
         userId: transaction.userId,
-        provider: transaction.providerType,
+        transactionType: transaction.transactionType,
         amount: transaction.amount,
-        currency: transaction.currency,
         reference: transaction.reference
       });
 
@@ -160,13 +146,11 @@ class Transaction {
       paymentEvents.emitPaymentEvent(PAYMENT_EVENTS.TRANSACTION_CREATED, {
         transactionId: transaction.id,
         userId: transaction.userId,
-        providerType: transaction.providerType,
+        transactionType: transaction.transactionType,
         amount: transaction.amount,
-        currency: transaction.currency,
         status: transaction.status,
         reference: transaction.reference,
-        description: transaction.description,
-        expiresAt: transaction.expiresAt
+        description: transaction.description
       });
 
       return transaction;
@@ -175,8 +159,7 @@ class Transaction {
       logger.error('Failed to create transaction', {
         error: error.message,
         transactionData: {
-          ...transactionData,
-          metadata: '...' // Don't log full metadata
+          ...transactionData
         }
       });
 
@@ -212,7 +195,7 @@ class Transaction {
    */
   static async findById(id, userId = null) {
     try {
-      let query = 'SELECT * FROM transactions WHERE id = $1';
+      let query = 'SELECT * FROM transactions WHERE transaction_id = $1';
       const values = [id];
 
       if (userId) {
@@ -249,7 +232,7 @@ class Transaction {
    */
   static async findByReference(reference) {
     try {
-      const query = 'SELECT * FROM transactions WHERE reference = $1';
+      const query = 'SELECT * FROM transactions WHERE reference_id = $1';
       const result = await dbConnection.query(query, [reference]);
 
       if (result.rows.length === 0) {
@@ -395,23 +378,17 @@ class Transaction {
       const values = [this.id, newStatus];
       let paramIndex = 3;
 
-      // Add optional update fields
+      // Add optional update fields (only if they exist in the schema)
       if (updateData.description) {
         updateFields.push(`description = $${paramIndex}`);
         values.push(updateData.description);
         paramIndex++;
       }
 
-      if (updateData.metadata) {
-        updateFields.push(`metadata = $${paramIndex}`);
-        values.push(JSON.stringify(updateData.metadata));
-        paramIndex++;
-      }
-
       const query = `
         UPDATE transactions
         SET ${updateFields.join(', ')}
-        WHERE id = $1
+        WHERE transaction_id = $1
         RETURNING *
       `;
 
@@ -421,12 +398,10 @@ class Transaction {
         throw PaymentError.transactionNotFoundError(this.id);
       }
 
-      // Update instance properties
       const updatedData = result.rows[0];
       this.status = updatedData.status;
       this.updatedAt = updatedData.updated_at;
       if (updateData.description) this.description = updatedData.description;
-      if (updateData.metadata) this.metadata = JSON.parse(updatedData.metadata);
 
       logger.info('Transaction status updated', {
         transactionId: this.id,
@@ -443,7 +418,7 @@ class Transaction {
         newStatus,
         amount: this.amount,
         currency: this.currency,
-        providerType: this.providerType,
+        transactionType: this.transactionType,
         reference: this.reference,
         description: this.description
       });
@@ -453,9 +428,8 @@ class Transaction {
     } catch (error) {
       logger.error('Failed to update transaction status', {
         transactionId: this.id,
-        currentStatus: this.status,
-        newStatus,
-        error: error.message
+        error: error.message,
+        stack: error.stack
       });
 
       if (error instanceof PaymentError) {
@@ -490,41 +464,12 @@ class Transaction {
     const finalStatuses = [
       TRANSACTION_STATUSES.COMPLETED,
       TRANSACTION_STATUSES.FAILED,
-      TRANSACTION_STATUSES.CANCELLED,
-      TRANSACTION_STATUSES.TIMEOUT
+      TRANSACTION_STATUSES.CANCELLED
     ];
 
     return finalStatuses.includes(this.status);
   }
 
-  /**
-   * Check if transaction has expired
-   *
-   * @returns {boolean} True if transaction has expired
-   */
-  isExpired() {
-    if (!this.expiresAt) {
-      return false;
-    }
-
-    return new Date() > new Date(this.expiresAt);
-  }
-
-  /**
-   * Mark transaction as expired
-   *
-   * @async
-   * @returns {Promise<boolean>} True if update successful
-   */
-  async markAsExpired() {
-    if (this.isFinal()) {
-      return false; // Already in final state
-    }
-
-    return await this.updateStatus(TRANSACTION_STATUSES.TIMEOUT, {
-      description: 'Transaction expired'
-    });
-  }
 
   /**
    * Get transaction duration in milliseconds
@@ -556,7 +501,6 @@ class Transaction {
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       expiresAt: this.expiresAt,
-      isExpired: this.isExpired(),
       isFinal: this.isFinal(),
       duration: this.getDuration()
     };
@@ -577,48 +521,6 @@ class Transaction {
     return json;
   }
 
-  /**
-   * Find and mark expired transactions
-   *
-   * @static
-   * @async
-   * @returns {Promise<number>} Number of transactions marked as expired
-   */
-  static async markExpiredTransactions() {
-    try {
-      const query = `
-        UPDATE transactions
-        SET status = $1, updated_at = NOW()
-        WHERE expires_at < NOW()
-        AND status IN ($2, $3)
-        RETURNING id
-      `;
-
-      const result = await dbConnection.query(query, [
-        TRANSACTION_STATUSES.TIMEOUT,
-        TRANSACTION_STATUSES.INITIATED,
-        TRANSACTION_STATUSES.PENDING
-      ]);
-
-      const expiredCount = result.rows.length;
-
-      if (expiredCount > 0) {
-        logger.info('Marked expired transactions', {
-          count: expiredCount,
-          transactionIds: result.rows.map(row => row.id)
-        });
-      }
-
-      return expiredCount;
-
-    } catch (error) {
-      logger.error('Failed to mark expired transactions', {
-        error: error.message
-      });
-
-      throw PaymentError.wrap(error, 'INTERNAL_ERROR', 'EXPIRE_TRANSACTIONS_FAILED');
-    }
-  }
 }
 
 module.exports = {

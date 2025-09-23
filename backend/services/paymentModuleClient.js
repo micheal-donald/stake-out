@@ -150,6 +150,7 @@ class PaymentModuleClient extends EventEmitter {
         phoneNumber: paymentData.phoneNumber,
         amount: paymentData.amount,
         currency: 'KES',
+        reference: `STK${Date.now()}${paymentData.userId || '000'}`, // Adding required reference field
         description: paymentData.description || 'StakeOut Bet Deposit',
         metadata: {
           userId: paymentData.userId,

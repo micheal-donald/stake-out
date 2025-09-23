@@ -513,7 +513,7 @@ class MpesaProvider extends PaymentProvider {
         success: true,
         transactionId: null, // Will be set by calling code
         externalReference: responseData.CheckoutRequestID,
-        status: 'initiated',
+        status: 'pending', // Changed from 'initiated' to 'pending' to match database constraints
         message: 'STK Push sent successfully. Please check your phone.',
         providerData: {
           merchantRequestId: responseData.MerchantRequestID,
@@ -751,7 +751,7 @@ class MpesaProvider extends PaymentProvider {
         success: true,
         transactionId: null, // Will be filled by calling code after database lookup
         externalReference: checkoutRequestId,
-        oldStatus: 'initiated', // Will be updated by calling code
+        oldStatus: 'pending', // Changed from 'initiated' to 'pending' to match database constraints
         newStatus,
         message: this.getResultMessage(resultCode, stkCallback.ResultDesc),
         data: {
@@ -841,7 +841,7 @@ class MpesaProvider extends PaymentProvider {
       0: 'completed',         // Success
       1032: 'cancelled',      // Request cancelled by user
       1037: 'timeout',        // User failed to complete transaction
-      2001: 'initiated',      // The initiator information is invalid
+      2001: 'pending',      // Changed from 'initiated' to 'pending' - The initiator information is invalid
       1: 'failed',           // Insufficient funds
       26: 'failed',          // System busy
       1025: 'failed',        // Unable to lock subscriber

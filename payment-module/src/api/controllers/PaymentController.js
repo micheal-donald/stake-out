@@ -18,7 +18,7 @@
  */
 
 const { providerFactory } = require('../../providers/ProviderFactory');
-const Transaction = require('../../database/models/Transaction');
+const { Transaction } = require('../../database/models/Transaction');
 const PaymentDetail = require('../../database/models/PaymentDetail');
 const { paymentEventEmitter } = require('../../events/PaymentEventEmitter');
 const PaymentError = require('../../errors/PaymentError');
@@ -40,7 +40,7 @@ class PaymentController {
    */
   static async initiatePayment(paymentData, user) {
     try {
-      const { provider, amount, phoneNumber, currency, description, metadata } = paymentData;
+      const { provider, amount, phoneNumber, currency, description, metadata, reference } = paymentData;
 
       logger.info('Payment initiation requested', {
         provider,
@@ -63,9 +63,11 @@ class PaymentController {
 
       // Create transaction record
       const transactionData = {
+        userId: user?.userId || metadata?.userId,
+        providerType: provider,
         amount: parseFloat(amount),
         currency: currency || 'KES',
-        provider,
+        reference: reference || `STK${Date.now()}${user?.userId || metadata?.userId || '000'}`,
         phoneNumber,
         description: description || 'Payment transaction',
         metadata: metadata || {},
@@ -90,16 +92,16 @@ class PaymentController {
       await Transaction.update(transaction.id, {
         providerTransactionId: providerResponse.transactionId,
         providerData: providerResponse.providerData,
-        status: providerResponse.status || 'initiated'
+        status: providerResponse.status || 'pending'
       });
 
       // Create payment detail record
       await PaymentDetail.create({
         transactionId: transaction.id,
-        provider,
-        providerTransactionId: providerResponse.transactionId,
-        providerData: providerResponse.providerData,
-        status: providerResponse.status || 'initiated'
+        providerName: provider,
+        providerData: providerResponse.providerData || {},
+        externalReference: providerResponse.transactionId,
+        callbackData: {}
       });
 
       // Emit payment initiated event
@@ -120,32 +122,28 @@ class PaymentController {
       });
 
       return {
-        transactionId: transaction.id,
-        status: providerResponse.status || 'initiated',
-        message: 'Payment initiated successfully',
         transaction: {
           id: transaction.id,
+          providerTransactionId: providerResponse.transactionId,
           amount: transaction.amount,
           currency: transaction.currency,
           phoneNumber: transaction.phoneNumber,
-          description: transaction.description,
           status: providerResponse.status || 'initiated',
-          providerTransactionId: providerResponse.transactionId,
-          expiresAt: transaction.expiresAt,
-          createdAt: transaction.createdAt
+          providerData: providerResponse.providerData,
+          expiresAt: transaction.expiresAt
         },
-        provider: {
-          name: provider,
-          message: providerResponse.message
-        }
+        message: providerResponse.message || 'Payment initiated successfully'
       };
 
     } catch (error) {
       logger.error('Payment initiation failed', {
         error: error.message,
         stack: error.stack,
-        provider: paymentData?.provider,
-        amount: paymentData?.amount
+        paymentData: {
+          ...paymentData,
+          phoneNumber: paymentData.phoneNumber?.slice(-4) // Log only last 4 digits
+        },
+        userId: user?.userId
       });
 
       throw error;
@@ -183,7 +181,7 @@ class PaymentController {
       const paymentDetail = await PaymentDetail.findByTransactionId(transactionId);
 
       // Check with provider for latest status if transaction is still pending
-      if (transaction.status === 'pending' || transaction.status === 'initiated') {
+      if (transaction.status === 'pending') {
         try {
           const provider = await providerFactory.getProvider(transaction.provider);
           if (provider && paymentDetail?.providerTransactionId) {
@@ -410,7 +408,7 @@ class PaymentController {
       }
 
       // Check if transaction can be cancelled
-      if (!['pending', 'initiated'].includes(transaction.status)) {
+      if (!['pending'].includes(transaction.status)) {
         throw new PaymentError(
           'INVALID_TRANSACTION_STATE',
           `Cannot cancel transaction with status: ${transaction.status}`,

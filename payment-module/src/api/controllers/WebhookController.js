@@ -18,8 +18,8 @@
  */
 
 const { providerFactory } = require('../../providers/ProviderFactory');
-const Transaction = require('../../database/models/Transaction');
-const PaymentDetail = require('../../database/models/PaymentDetail');
+const { Transaction } = require('../../database/models/Transaction');
+const { PaymentDetail } = require('../../database/models/PaymentDetail');
 const { paymentEventEmitter } = require('../../events/PaymentEventEmitter');
 const PaymentError = require('../../errors/PaymentError');
 const logger = require('../../utils/logger');
@@ -429,9 +429,9 @@ class WebhookController {
         }
       }
 
-      if (transaction && ['pending', 'initiated'].includes(transaction.status)) {
+      if (transaction && ['pending'].includes(transaction.status)) { // Removed 'initiated' since it's not a valid status
         await Transaction.update(transaction.id, {
-          status: 'timeout',
+          status: 'failed', // Changed from 'timeout' to 'failed' as 'timeout' is not a valid status
           metadata: {
             ...transaction.metadata,
             timeout: {

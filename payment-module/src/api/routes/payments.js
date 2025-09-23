@@ -555,19 +555,22 @@ router.get('/:transactionId/status',
  *         description: Internal server error
  */
 router.get('/history',
-  authMiddleware.authenticate,
+  authMiddleware.authenticateApiKey,
   transactionHistoryValidation,
   validationMiddleware.handleValidationErrors,
   async (req, res) => {
     const operationContext = logger.startOperation('payment_history', {
-      userId: req.user?.userId,
+      userId: req.query.userId,
       page: req.query.page || 1,
       limit: req.query.limit || 20,
-      correlationId: req.correlationId
+      correlationId: req.correlationId,
+      serviceAuth: req.service?.type === 'api_key'
     });
 
     try {
-      const result = await PaymentController.getPaymentHistory(req.query, req.user);
+      // For API key authentication, user info comes from query params
+      const user = req.service?.type === 'api_key' ? null : req.user;
+      const result = await PaymentController.getPaymentHistory(req.query, user);
 
       logger.endOperation(operationContext, true, {
         totalTransactions: result.pagination.totalCount,

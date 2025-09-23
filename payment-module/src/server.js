@@ -19,6 +19,9 @@
  * @since 1.0.0
  */
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');

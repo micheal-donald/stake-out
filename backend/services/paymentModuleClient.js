@@ -32,7 +32,7 @@ class PaymentModuleClient extends EventEmitter {
 
     this.config = {
       baseUrl: config.baseUrl || process.env.PAYMENT_MODULE_URL || 'http://localhost:3737',
-      apiKey: config.apiKey || process.env.PAYMENT_MODULE_API_KEY,
+      apiKey: config.apiKey || process.env.PAYMENT_MODULE_API_KEY || 'missing-api-key',
       timeout: config.timeout || 30000,
       enableEvents: config.enableEvents !== false,
       retries: config.retries || 3,
@@ -236,7 +236,7 @@ class PaymentModuleClient extends EventEmitter {
         ...(options.status && { status: options.status })
       });
 
-      const response = await this.client.get(`/api/payments?${params}`);
+      const response = await this.client.get(`/api/payments/history?${params}`);
 
       return {
         success: true,
@@ -280,7 +280,7 @@ class PaymentModuleClient extends EventEmitter {
    */
   async getProviders() {
     try {
-      const response = await this.client.get('/api/providers');
+      const response = await this.client.get('/api/payments/providers');
 
       return {
         success: true,

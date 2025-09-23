@@ -6,7 +6,7 @@
 -- Create legacy payment mapping table for backward compatibility
 CREATE TABLE IF NOT EXISTS legacy_payment_mapping (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     checkout_request_id VARCHAR(255) NOT NULL UNIQUE,
     payment_module_transaction_id VARCHAR(255) NOT NULL,
     amount DECIMAL(10,2) NOT NULL,

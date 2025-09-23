@@ -78,7 +78,17 @@ class MigrationRunner {
       const files = await fs.readdir(this.migrationsDir);
       return files
         .filter(file => file.endsWith('.sql'))
-        .sort(); // Ensure migrations run in order
+        .sort((a, b) => {
+          // Prioritize base migrations (without numeric prefix) over numbered migrations
+          const aIsNumbered = /^\d+_/.test(a);
+          const bIsNumbered = /^\d+_/.test(b);
+
+          if (!aIsNumbered && bIsNumbered) return -1; // a comes first
+          if (aIsNumbered && !bIsNumbered) return 1;  // b comes first
+
+          // Both are same type, sort alphabetically
+          return a.localeCompare(b);
+        });
     } catch (error) {
       console.error('Error reading migrations directory:', error);
       return [];

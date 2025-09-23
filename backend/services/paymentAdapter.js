@@ -308,8 +308,16 @@ class PaymentAdapter {
           `DELETE FROM legacy_payment_mapping
            WHERE created_at < NOW() - INTERVAL '24 hours'`
         );
+        console.log('Legacy payment mappings cleanup completed');
       } catch (error) {
-        console.error('Failed to cleanup legacy mappings:', error);
+        // Handle specific database errors gracefully
+        if (error.code === '42P01') {
+          // Table doesn't exist - log warning but don't fail
+          console.warn('Legacy payment mapping table does not exist, skipping cleanup');
+        } else {
+          console.error('Failed to cleanup legacy mappings:', error.message);
+          // Log the error but don't throw - cleanup failures shouldn't break payment operations
+        }
       }
     } else if (this.legacyService) {
       return await this.legacyService.cleanupExpiredTransactions();

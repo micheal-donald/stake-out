@@ -137,10 +137,13 @@ class PaymentAdapter {
     const paymentModuleAvailable = await this.isPaymentModuleAvailable();
 
     if (paymentModuleAvailable) {
-      // When using payment module, the transaction is already saved in the same database
-      // No need for mapping table since both systems use the same transactions table
-      console.log('Payment module transaction already saved');
-      return checkoutRequestId; // Use checkout request ID as transaction identifier
+      // When using payment module, we still need to save the transaction in the database
+      // The payment module will process it later when the callback arrives
+      console.log('Saving transaction in database for payment module processing');
+      if (this.legacyService) {
+        return await this.legacyService.saveTransaction(userId, checkoutRequestId, amount, phoneNumber);
+      }
+      throw new Error('No legacy service available to save transaction');
     } else if (this.legacyService) {
       return await this.legacyService.saveTransaction(userId, checkoutRequestId, amount, phoneNumber);
     } else {
@@ -168,7 +171,9 @@ class PaymentAdapter {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': this.config.paymentModuleApiKey
+            'X-API-Key': this.config.paymentModuleApiKey,
+            // Add timestamp header to avoid the warning
+            'x-webhook-timestamp': Math.floor(Date.now() / 1000).toString()
           },
           body: JSON.stringify(callbackData),
           timeout: this.config.paymentModuleTimeout

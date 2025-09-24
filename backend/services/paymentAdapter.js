@@ -10,6 +10,7 @@
  */
 
 const pool = require('../config/db');
+const fetch = require('node-fetch');
 
 /**
  * Payment Adapter for StakeOut Application
@@ -27,6 +28,9 @@ class PaymentAdapter {
     this.config = {
       usePaymentModule: config.usePaymentModule !== false,
       fallbackToLegacy: config.fallbackToLegacy !== false,
+      paymentModuleUrl: config.paymentModule?.baseUrl || config.paymentModuleUrl || process.env.PAYMENT_MODULE_URL,
+      paymentModuleApiKey: config.paymentModule?.apiKey || config.paymentModuleApiKey,
+      paymentModuleTimeout: config.paymentModule?.timeout || config.paymentModuleTimeout || 30000,
       ...config
     };
 
@@ -159,6 +163,21 @@ class PaymentAdapter {
         // Forward the callback to the payment module
         // The payment module will handle the processing and update the same database
         console.log('Forwarding callback to payment module');
+        
+        const response = await fetch(`${this.config.paymentModuleUrl}/api/webhooks/mpesa/callback`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': this.config.paymentModuleApiKey
+          },
+          body: JSON.stringify(callbackData),
+          timeout: this.config.paymentModuleTimeout
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Payment module returned ${response.status}: ${response.statusText}`);
+        }
+        
         return { success: true, message: 'Callback forwarded to payment module' };
       } catch (error) {
         console.error('Failed to forward callback to payment module:', error);

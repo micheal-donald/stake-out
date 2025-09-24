@@ -20,6 +20,7 @@ const GameServer = require('./game');
 
 //Imports for Mpesa
 const mpesaRoutes = require('./routes/mpesa');
+const webhooksRoutes = require('./routes/webhooks');
 
 // Initialize Express app
 const app = express();
@@ -63,6 +64,8 @@ app.use('/api/game', gameRoutes);
 app.use('/api/wallet', walletRoutes);
 // Add M-Pesa routes
 app.use('/api/mpesa', mpesaRoutes);
+// Add webhooks routes for payment module compatibility
+app.use('/api/webhooks', webhooksRoutes);
 
 // Initialize the game server
 const gameServer = new GameServer(io);

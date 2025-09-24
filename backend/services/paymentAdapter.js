@@ -139,28 +139,10 @@ class PaymentAdapter {
     const paymentModuleAvailable = await this.isPaymentModuleAvailable();
 
     if (paymentModuleAvailable) {
-      // When using payment module, the transaction is already saved
-      // We just need to create a mapping in the local database for compatibility
-      try {
-        const result = await pool.query(
-          `INSERT INTO legacy_payment_mapping (
-            user_id,
-            checkout_request_id,
-            payment_module_transaction_id,
-            amount,
-            phone_number,
-            created_at
-          ) VALUES ($1, $2, $3, $4, $5, NOW())
-          RETURNING id`,
-          [userId, checkoutRequestId, checkoutRequestId, amount, phoneNumber]
-        );
-
-        return result.rows[0].id.toString();
-      } catch (error) {
-        console.error('Failed to save legacy mapping:', error);
-        // Return the checkout request ID as fallback
-        return checkoutRequestId;
-      }
+      // When using payment module, the transaction is already saved in the same database
+      // No need for mapping table since both systems use the same transactions table
+      console.log('Payment module transaction already saved');
+      return checkoutRequestId; // Use checkout request ID as transaction identifier
     } else if (this.legacyService) {
       return await this.legacyService.saveTransaction(userId, checkoutRequestId, amount, phoneNumber);
     } else {
@@ -181,30 +163,8 @@ class PaymentAdapter {
       console.log('Forwarding callback to payment module');
       try {
         // Forward the callback to the payment module
-        // The payment module will handle the processing and update its database
-        // We need to also update our local mapping if it exists
-        const checkoutRequestId = callbackData.Body?.stkCallback?.CheckoutRequestID;
-
-        if (checkoutRequestId) {
-          // Check if we have a local mapping
-          const mappingResult = await pool.query(
-            'SELECT * FROM legacy_payment_mapping WHERE checkout_request_id = $1',
-            [checkoutRequestId]
-          );
-
-          if (mappingResult.rows.length > 0) {
-            const mapping = mappingResult.rows[0];
-
-            // Update the mapping with callback data
-            await pool.query(
-              `UPDATE legacy_payment_mapping
-               SET callback_data = $1, updated_at = NOW()
-               WHERE id = $2`,
-              [JSON.stringify(callbackData), mapping.id]
-            );
-          }
-        }
-
+        // The payment module will handle the processing and update the same database
+        console.log('Forwarding callback to payment module');
         return { success: true, message: 'Callback forwarded to payment module' };
       } catch (error) {
         console.error('Failed to forward callback to payment module:', error);
@@ -235,20 +195,8 @@ class PaymentAdapter {
       try {
         console.log('Checking status via payment module');
 
-        // First, try to find the payment module transaction ID
-        let transactionId = checkoutRequestId;
-
-        // Check if we have a local mapping
-        const mappingResult = await pool.query(
-          'SELECT payment_module_transaction_id FROM legacy_payment_mapping WHERE checkout_request_id = $1',
-          [checkoutRequestId]
-        );
-
-        if (mappingResult.rows.length > 0) {
-          transactionId = mappingResult.rows[0].payment_module_transaction_id;
-        }
-
-        const statusResponse = await this.paymentClient.checkPaymentStatus(transactionId);
+        // Use checkoutRequestId directly since both systems use the same database
+        const statusResponse = await this.paymentClient.checkPaymentStatus(checkoutRequestId);
 
         // Convert to legacy format
         return {
@@ -301,24 +249,8 @@ class PaymentAdapter {
     const paymentModuleAvailable = await this.isPaymentModuleAvailable();
 
     if (paymentModuleAvailable) {
-      // Payment module handles its own cleanup
-      // We just need to clean up our local mappings
-      try {
-        await pool.query(
-          `DELETE FROM legacy_payment_mapping
-           WHERE created_at < NOW() - INTERVAL '24 hours'`
-        );
-        console.log('Legacy payment mappings cleanup completed');
-      } catch (error) {
-        // Handle specific database errors gracefully
-        if (error.code === '42P01') {
-          // Table doesn't exist - log warning but don't fail
-          console.warn('Legacy payment mapping table does not exist, skipping cleanup');
-        } else {
-          console.error('Failed to cleanup legacy mappings:', error.message);
-          // Log the error but don't throw - cleanup failures shouldn't break payment operations
-        }
-      }
+      // Payment module uses the same database, no separate cleanup needed
+      console.log('Payment module cleanup - using same database as legacy system');
     } else if (this.legacyService) {
       return await this.legacyService.cleanupExpiredTransactions();
     }

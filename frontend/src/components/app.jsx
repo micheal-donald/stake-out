@@ -26,7 +26,7 @@ const Navbar = ({ isAuthenticated, logout, user }) => {
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <Link to="/">Stake Out Bet</Link>
+        <Link to="/">Battle Arena</Link>
       </div>
       
       <div className="navbar-menu">
@@ -122,7 +122,7 @@ const AppContent = () => {
       </div>
       
       <footer className="footer">
-        <p>&copy; {new Date().getFullYear()} Stake Out Bet. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Akiba Softwares. All rights reserved.</p>
       </footer>
     </div>
   );

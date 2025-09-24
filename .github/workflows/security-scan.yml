@@ -1,4 +1,4 @@
-# Security Scanning Workflow for Stake Out Bet
+# Security Scanning Workflow for Battle Arena
 # Runs comprehensive security scans on code and dependencies
 
 name: Security Scan

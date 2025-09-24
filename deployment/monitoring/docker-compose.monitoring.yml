@@ -1,4 +1,4 @@
-# Comprehensive Monitoring Stack for Stake Out Bet
+# Comprehensive Monitoring Stack for Battle Arena
 # Includes Prometheus, Grafana, AlertManager, and log aggregation
 
 version: '3.8'

@@ -1,4 +1,4 @@
-# Prometheus Alerting Rules for Stake Out Bet Application
+# Prometheus Alerting Rules for Battle Arena Application
 # Defines critical, warning, and info level alerts
 
 groups:
@@ -15,7 +15,7 @@ groups:
         severity: critical
         service: backend
       annotations:
-        summary: "Stake Out Bet backend service is down"
+        summary: "Battle Arena backend service is down"
         description: "The backend service has been down for more than 1 minute"
         runbook_url: "https://docs.stakeoutbet.com/runbooks/backend-service-down"
 
@@ -27,7 +27,7 @@ groups:
         severity: critical
         service: frontend
       annotations:
-        summary: "Stake Out Bet website is unreachable"
+        summary: "Battle Arena website is unreachable"
         description: "The main website has been unreachable for more than 2 minutes"
 
     # High response time

@@ -21,7 +21,7 @@ const MockedApp = () => (
   </BrowserRouter>
 );
 
-test('renders stake out bet app', () => {
+test('renders Battle Arena app', () => {
   render(<MockedApp />);
   // Check for the main game interface instead of "learn react"
   expect(document.body).toBeInTheDocument();

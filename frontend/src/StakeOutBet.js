@@ -412,9 +412,7 @@ const StakeOutBet = () => {
     <div className="game-container">
       {/* Main Game Area - 70% of screen */}
       <div className="game-area">
-        <div className="card h-full">
-          <h1 className="text-3xl font-bold mb-lg text-center">Stake Out Bet</h1>
-          
+        <div className="card h-full">          
           {/* Game Display */}
           <div className="game-canvas mb-lg">
             {/* Game graph */}

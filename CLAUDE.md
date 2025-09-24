@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Stake Out Bet is a real-time crash gambling game built with Node.js/Express backend and React frontend. Players place bets before each round and must cash out before the multiplier crashes. The game uses Socket.IO for real-time communication and includes provable fairness features.
+Battle Arena is a real-time crash gambling game built with Node.js/Express backend and React frontend. Players place bets before each round and must cash out before the multiplier crashes. The game uses Socket.IO for real-time communication and includes provable fairness features.
 
 ## Development Commands
 

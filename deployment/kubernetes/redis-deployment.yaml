@@ -178,7 +178,7 @@ metadata:
     app.kubernetes.io/component: redis
 data:
   redis.conf: |
-    # Redis configuration for Stake Out Bet
+    # Redis configuration for Battle Arena
     
     # Network
     bind 0.0.0.0

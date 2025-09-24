@@ -43,8 +43,8 @@ const Navbar = ({ isAuthenticated, logout, user }) => {
       <div className="navbar-brand">
         <Link to="/" onClick={closeMobileMenu}>
           <span className="brand-icon">⚔️</span>
-          Stake Out Bet
-          <span className="brand-subtitle">Battle Arena</span>
+          Battle Arena
+          <span className="brand-subtitle"></span>
         </Link>
       </div>
       
@@ -180,7 +180,7 @@ const AppContent = () => {
       </div>
       
       <footer className="footer">
-        <p>&copy; {new Date().getFullYear()} Stake Out Bet. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Akiba Software Holdings. All rights reserved.</p>
       </footer>
     </div>
   );

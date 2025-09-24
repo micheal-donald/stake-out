@@ -1,4 +1,4 @@
-# Prometheus Configuration for Stake Out Bet Monitoring
+# Prometheus Configuration for Battle Arena Monitoring
 # Defines scrape targets, alerting rules, and service discovery
 
 global:

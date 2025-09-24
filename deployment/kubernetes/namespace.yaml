@@ -1,4 +1,4 @@
-# Kubernetes namespace for Stake Out Bet application
+# Kubernetes namespace for Battle Arena application
 # This isolates all application resources within a dedicated namespace
 
 apiVersion: v1
@@ -11,4 +11,4 @@ metadata:
     app.kubernetes.io/version: "1.0.0"
     app.kubernetes.io/managed-by: kubectl
   annotations:
-    description: "Stake Out Bet real-time gambling application"
+    description: "Battle Arena real-time gambling application"

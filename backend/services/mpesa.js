@@ -81,7 +81,7 @@ class MpesaService {
         PhoneNumber: formattedPhone,
         CallBackURL: this.callbackUrl,
         AccountReference: accountReference,
-        TransactionDesc: 'Stake Out Bet Deposit'
+        TransactionDesc: 'Battle Arena Deposit'
       };
       
       // Log the request payload for debugging

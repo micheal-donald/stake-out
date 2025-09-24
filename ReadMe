@@ -1,6 +1,6 @@
 Repository Overview
 
-Stake Out Bet is a full‑stack gambling application consisting of a Node.js/Express backend, a React frontend and a PostgreSQL database. Real‑time interaction is provided via Socket.IO. The project’s structure is documented in CLAUDE.md.
+Battle Arena is a full‑stack gambling application consisting of a Node.js/Express backend, a React frontend and a PostgreSQL database. Real‑time interaction is provided via Socket.IO. The project’s structure is documented in CLAUDE.md.
 
 Backend
 Entry point: backend/server.js sets up Express routes, initializes Socket.IO, and starts the game server.

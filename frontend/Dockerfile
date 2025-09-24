@@ -1,4 +1,4 @@
-# Production Dockerfile for Stake Out Bet Frontend
+# Production Dockerfile for Battle Arena Frontend
 # Multi-stage build for optimized production image
 
 # ===================================
@@ -103,6 +103,6 @@ EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
 # Metadata
-LABEL maintainer="Stake Out Bet Team"
+LABEL maintainer="Battle Arena Team"
 LABEL version="1.0.0"
-LABEL description="Stake Out Bet Frontend Service - Production"
+LABEL description="Battle Arena Frontend Service - Production"

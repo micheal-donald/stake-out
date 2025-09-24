@@ -1,4 +1,4 @@
-# Kubernetes Deployment for Stake Out Bet Frontend Service
+# Kubernetes Deployment for Battle Arena Frontend Service
 # Handles the React SPA with nginx reverse proxy
 
 apiVersion: apps/v1

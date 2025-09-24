@@ -1,4 +1,4 @@
-# Kubernetes Deployment for Stake Out Bet Backend Service
+# Kubernetes Deployment for Battle Arena Backend Service
 # Handles the Node.js/Express API with Socket.IO for real-time gaming
 
 apiVersion: apps/v1

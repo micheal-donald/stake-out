@@ -1027,6 +1027,8 @@
   font-weight: 600;
   transition: border-color 0.2s ease;
   width: 100%;
+  font-family: 'Inter', monospace; /* Use monospace font for consistent number alignment */
+  text-align: center; /* Center the text for better appearance */
 }
 
 .auto-input:focus {
@@ -1372,6 +1374,31 @@
     font-size: 11px;
   }
 }
+
+/* History List Styles */
+.history-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm); /* Consistent spacing between items */
+}
+
+.history-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  min-width: 70px; /* Ensure consistent width */
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.history-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* Mobile-First Neon Pulse Button Styles */
 .mobile-action-btn.btn-bet {
   background: linear-gradient(135deg, var(--primary-color) 0%, #0099CC 100%);

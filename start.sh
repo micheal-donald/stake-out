@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # =============================================================================
-# Stake Out Bet - Development Startup Script
+# Battle Arena - Development Startup Script
 # =============================================================================
-# This script automates the setup and startup of the Stake Out Bet application
+# This script automates the setup and startup of the Battle Arena application
 # for development. It handles database initialization, dependency installation,
 # and starts backend, frontend, and payment module services.
 #
@@ -455,7 +455,7 @@ start_frontend() {
 
 # Show help
 show_help() {
-    echo "Stake Out Bet - Development Startup Script"
+    echo "Battle Arena - Development Startup Script"
     echo ""
     echo "Usage: $0 [OPTIONS]"
     echo ""
@@ -514,7 +514,7 @@ trap cleanup EXIT INT TERM
 
 # Main execution
 main() {
-    print_header "Stake Out Bet - Development Startup"
+    print_header "Battle Arena - Development Startup"
     
     # Parse command line arguments
     SETUP_MODE=false

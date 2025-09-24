@@ -1,8 +1,8 @@
-# Stake Out Bet - Deployment Guide
+# Battle Arena - Deployment Guide
 
 ## Overview
 
-This document provides comprehensive deployment strategies and infrastructure requirements for the Stake Out Bet real-time gambling application.
+This document provides comprehensive deployment strategies and infrastructure requirements for the Battle Arena real-time gambling application.
 
 ## Architecture Components
 

@@ -1,7 +1,7 @@
-# GitHub Actions CI/CD Pipeline for Stake Out Bet
+# GitHub Actions CI/CD Pipeline for Battle Arena
 # Provides automated testing, building, and deployment
 
-name: Stake Out Bet CI/CD
+name: Battle Arena CI/CD
 
 on:
   push:
@@ -513,7 +513,7 @@ jobs:
         curl -X POST "${{ secrets.DATADOG_WEBHOOK_URL }}" \
           -H "Content-Type: application/json" \
           -d '{
-            "title": "Stake Out Bet Production Deployment",
+            "title": "Battle Arena Production Deployment",
             "text": "Deployed version ${{ github.sha }} to production",
             "alert_type": "success",
             "source_type_name": "github"

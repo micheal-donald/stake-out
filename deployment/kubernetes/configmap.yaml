@@ -1,4 +1,4 @@
-# ConfigMap for Stake Out Bet application configuration
+# ConfigMap for Battle Arena application configuration
 # Contains non-sensitive configuration data
 
 apiVersion: v1

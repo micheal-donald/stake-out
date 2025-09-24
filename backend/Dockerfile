@@ -1,4 +1,4 @@
-# Production Dockerfile for Stake Out Bet Backend
+# Production Dockerfile for Battle Arena Backend
 # Multi-stage build for optimized production image
 
 # ===================================
@@ -68,6 +68,6 @@ ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]
 
 # Metadata
-LABEL maintainer="Stake Out Bet Team"
+LABEL maintainer="Battle Arena Team"
 LABEL version="1.0.0"
-LABEL description="Stake Out Bet Backend Service - Production"
+LABEL description="Battle Arena Backend Service - Production"

@@ -383,7 +383,7 @@ router.post('/stk-push', async (req, res) => {
       amount: parseFloat(amount),
       phoneNumber,
       reference: `STAKEOUT${userId}${Date.now().toString().slice(-6)}`,
-      description: 'Stake Out Bet Deposit',
+      description: 'Battle Arena Deposit',
       userId
     };
 

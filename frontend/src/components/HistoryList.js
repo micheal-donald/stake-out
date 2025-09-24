@@ -5,11 +5,11 @@ const HistoryList = ({ history }) => {
   return (
     <div className="w-full">
       <h2 className="text-xl font-bold mb-2">Previous Crashes</h2>
-      <div className="flex flex-wrap gap-2">
+      <div className="history-list flex flex-wrap gap-2">
         {history.map(item => (
           <div 
             key={item.id} 
-            className={`px-3 py-1 rounded
+            className={`history-item px-3 py-1 rounded font-mono
                       ${item.crash < 2 ? 'bg-red-800' : ''}
                       ${item.crash >= 2 && item.crash < 4 ? 'bg-yellow-800' : ''}
                       ${item.crash >= 4 ? 'bg-green-800' : ''}`}

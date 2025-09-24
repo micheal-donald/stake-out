@@ -142,7 +142,7 @@ const Controls = ({
                     border: 'none',
                     cursor: canPlaceBet ? 'pointer' : 'not-allowed',
                     opacity: canPlaceBet ? 1 : 0.5,
-                    boxShadow: canPlaceBet ? '0 4px 6px rgba(0, 0, 0, 0.1)' : 'none'
+                    boxShadow: canCashOut ? '0 4px 6px rgba(0, 0, 0, 0.1)' : 'none'
                   }}
                   onMouseOver={(e) => {
                     if (canPlaceBet) e.target.style.backgroundColor = '#059669';
@@ -271,8 +271,8 @@ const Controls = ({
                   type="number"
                   value={autoCashOut}
                   onChange={(e) => setAutoCashOut(parseFloat(e.target.value) || 1.0)}
-                  min="1.01"
-                  step="0.01"
+                  min="1.0"
+                  step="0.1"
                   disabled={!isWaiting || hasActiveBet}
                   className="auto-input"
                 />

@@ -19,7 +19,6 @@
 
 const { providerFactory } = require('../../providers/ProviderFactory');
 const { Transaction } = require('../../database/models/Transaction');
-const PaymentDetail = require('../../database/models/PaymentDetail');
 const { paymentEventEmitter } = require('../../events/PaymentEventEmitter');
 const PaymentError = require('../../errors/PaymentError');
 const logger = require('../../utils/logger');
@@ -61,19 +60,13 @@ class PaymentController {
         );
       }
 
-      // Create transaction record
+      // Create transaction record using legacy schema
       const transactionData = {
         userId: user?.userId || metadata?.userId,
-        providerType: provider,
+        transactionType: 'deposit', // For M-Pesa payments, always use deposit
         amount: parseFloat(amount),
-        currency: currency || 'KES',
         reference: reference || `STK${Date.now()}${user?.userId || metadata?.userId || '000'}`,
-        phoneNumber,
-        description: description || 'Payment transaction',
-        metadata: metadata || {},
-        status: 'pending',
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + (5 * 60 * 1000)) // 5 minutes expiry
+        description: description || 'Payment transaction'
       };
 
       const transaction = await Transaction.create(transactionData);
@@ -82,26 +75,8 @@ class PaymentController {
       const providerResponse = await paymentProvider.initiatePayment({
         transactionId: transaction.id,
         amount: transaction.amount,
-        phoneNumber: transaction.phoneNumber,
-        currency: transaction.currency,
-        description: transaction.description,
-        metadata: transaction.metadata
-      });
-
-      // Update transaction with provider details
-      await Transaction.update(transaction.id, {
-        providerTransactionId: providerResponse.transactionId,
-        providerData: providerResponse.providerData,
-        status: providerResponse.status || 'pending'
-      });
-
-      // Create payment detail record
-      await PaymentDetail.create({
-        transactionId: transaction.id,
-        providerName: provider,
-        providerData: providerResponse.providerData || {},
-        externalReference: providerResponse.transactionId,
-        callbackData: {}
+        phoneNumber,
+        description: transaction.description
       });
 
       // Emit payment initiated event
@@ -109,8 +84,7 @@ class PaymentController {
         transactionId: transaction.id,
         provider,
         amount: transaction.amount,
-        phoneNumber: transaction.phoneNumber,
-        metadata: transaction.metadata,
+        phoneNumber,
         providerResponse
       });
 
@@ -126,11 +100,8 @@ class PaymentController {
           id: transaction.id,
           providerTransactionId: providerResponse.transactionId,
           amount: transaction.amount,
-          currency: transaction.currency,
-          phoneNumber: transaction.phoneNumber,
-          status: providerResponse.status || 'initiated',
-          providerData: providerResponse.providerData,
-          expiresAt: transaction.expiresAt
+          phoneNumber,
+          status: providerResponse.status || 'pending'
         },
         message: providerResponse.message || 'Payment initiated successfully'
       };
@@ -177,63 +148,16 @@ class PaymentController {
         );
       }
 
-      // Get payment details
-      const paymentDetail = await PaymentDetail.findByTransactionId(transactionId);
-
-      // Check with provider for latest status if transaction is still pending
-      if (transaction.status === 'pending') {
-        try {
-          const provider = await providerFactory.getProvider(transaction.provider);
-          if (provider && paymentDetail?.providerTransactionId) {
-            const providerStatus = await provider.checkStatus(paymentDetail.providerTransactionId);
-
-            // Update transaction status if it changed
-            if (providerStatus.status !== transaction.status) {
-              await Transaction.update(transactionId, {
-                status: providerStatus.status,
-                updatedAt: new Date()
-              });
-
-              await PaymentDetail.update(paymentDetail.id, {
-                status: providerStatus.status,
-                providerData: { ...paymentDetail.providerData, ...providerStatus.data }
-              });
-
-              // Emit status change event
-              paymentEventEmitter.emit('payment.status_changed', {
-                transactionId,
-                oldStatus: transaction.status,
-                newStatus: providerStatus.status,
-                providerData: providerStatus.data
-              });
-
-              transaction.status = providerStatus.status;
-            }
-          }
-        } catch (providerError) {
-          logger.warn('Failed to check provider status', {
-            requestId: req.requestId,
-            transactionId,
-            provider: transaction.provider,
-            error: providerError.message
-          });
-        }
-      }
-
       res.json({
         success: true,
         transaction: {
           id: transaction.id,
           amount: transaction.amount,
-          currency: transaction.currency,
-          phoneNumber: transaction.phoneNumber,
           description: transaction.description,
           status: transaction.status,
-          provider: transaction.provider,
-          providerTransactionId: paymentDetail?.providerTransactionId,
+          transactionType: transaction.transactionType,
           createdAt: transaction.createdAt,
-          updatedAt: transaction.updatedAt,
-          expiresAt: transaction.expiresAt
+          updatedAt: transaction.updatedAt
         },
         requestId: req.requestId
       });
@@ -276,24 +200,16 @@ class PaymentController {
         );
       }
 
-      const paymentDetail = await PaymentDetail.findByTransactionId(transactionId);
-
       res.json({
         success: true,
         transaction: {
           id: transaction.id,
           amount: transaction.amount,
-          currency: transaction.currency,
-          phoneNumber: transaction.phoneNumber,
           description: transaction.description,
           status: transaction.status,
-          provider: transaction.provider,
-          metadata: transaction.metadata,
-          providerTransactionId: paymentDetail?.providerTransactionId,
-          providerData: paymentDetail?.providerData,
+          transactionType: transaction.transactionType,
           createdAt: transaction.createdAt,
-          updatedAt: transaction.updatedAt,
-          expiresAt: transaction.expiresAt
+          updatedAt: transaction.updatedAt
         },
         requestId: req.requestId
       });
@@ -417,54 +333,10 @@ class PaymentController {
         );
       }
 
-      // Check user authorization if userId provided
-      if (userId && transaction.metadata?.userId !== userId) {
-        throw new PaymentError(
-          'UNAUTHORIZED_CANCELLATION',
-          'User not authorized to cancel this transaction',
-          'AUTHORIZATION_ERROR',
-          { userId, transactionUserId: transaction.metadata?.userId }
-        );
-      }
-
-      // Cancel with provider if possible
-      const paymentDetail = await PaymentDetail.findByTransactionId(transactionId);
-      if (paymentDetail?.providerTransactionId) {
-        try {
-          const provider = await providerFactory.getProvider(transaction.provider);
-          if (provider && typeof provider.cancelPayment === 'function') {
-            await provider.cancelPayment(paymentDetail.providerTransactionId);
-          }
-        } catch (providerError) {
-          logger.warn('Provider cancellation failed', {
-            requestId: req.requestId,
-            transactionId,
-            provider: transaction.provider,
-            error: providerError.message
-          });
-        }
-      }
-
-      // Update transaction status
-      await Transaction.update(transactionId, {
-        status: 'cancelled',
-        metadata: {
-          ...transaction.metadata,
-          cancellation: {
-            reason: reason || 'User requested cancellation',
-            cancelledAt: new Date(),
-            cancelledBy: userId || 'system'
-          }
-        },
-        updatedAt: new Date()
+      // Update transaction status to failed (legacy schema uses failed instead of cancelled)
+      await transaction.updateStatus('failed', {
+        description: `Transaction cancelled: ${reason || 'User requested cancellation'}`
       });
-
-      // Update payment detail
-      if (paymentDetail) {
-        await PaymentDetail.update(paymentDetail.id, {
-          status: 'cancelled'
-        });
-      }
 
       // Emit cancellation event
       paymentEventEmitter.emit('payment.cancelled', {
@@ -485,7 +357,7 @@ class PaymentController {
         message: 'Payment cancelled successfully',
         transaction: {
           id: transactionId,
-          status: 'cancelled',
+          status: 'failed',
           cancelledAt: new Date()
         },
         requestId: req.requestId
@@ -533,18 +405,17 @@ class PaymentController {
         provider
       });
 
-      // For now, return empty results as the Transaction model expects user_id column
-      // which doesn't exist in our current setup
-      return {
-        transactions: [],
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: 0,
-          totalCount: 0,
-          hasNext: false,
-          hasPrevious: false
-        }
-      };
+      // Now use the Transaction.findByUser method with legacy schema
+      const result = await Transaction.findByUser(targetUserId, {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        status,
+        provider,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined
+      });
+
+      return result;
 
     } catch (error) {
       logger.error('Get payment history failed', {

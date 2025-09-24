@@ -64,7 +64,12 @@ const LiveBetsComponent = ({ gameState, activePlayers = 0, socketRef }) => {
   };
 
   return (
-    <div className="battle-intel-feed">
+    <div className="battle-intel-feed" style={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      minHeight: 0 // Allow flex item to shrink below its content size
+    }}>
       {/* Header */}
       <div className="intel-header">
         <div className="intel-title">
@@ -104,7 +109,11 @@ const LiveBetsComponent = ({ gameState, activePlayers = 0, socketRef }) => {
       </div>
 
       {/* Active Deployments */}
-      <div className="deployment-feed">
+      <div className="deployment-feed" style={{ 
+        flex: 1, 
+        overflowY: 'auto',
+        minHeight: 0 // Allow flex item to shrink below its content size
+      }}>
         {liveBets.length === 0 ? (
           <div className="no-deployments">
             <div className="empty-radar">

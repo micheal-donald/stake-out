@@ -230,14 +230,14 @@ const Controls = ({
           <div className="auto-card bot-config-card">
             <div className="auto-card-header">
               <span className="auto-card-icon">🤖</span>
-              <h3 className="auto-card-title">Bot Configuration</h3>
+              <h3 className="auto-card-title">Bot Settings</h3>
             </div>
             
             {/* Auto Bet Amount */}
             <div className="auto-input-group">
               <label className="auto-label">
                 <span className="auto-label-icon">💰</span>
-                Deployment Amount
+                Bet Amount
               </label>
               <div className="auto-amount-controls">
                 <button
@@ -264,7 +264,7 @@ const Controls = ({
             <div className="auto-input-group">
               <label className="auto-label">
                 <span className="auto-label-icon">🎯</span>
-                Emergency Extraction at
+                Cash Out At
               </label>
               <div className="auto-cashout-controls">
                 <input
@@ -276,7 +276,7 @@ const Controls = ({
                   disabled={!isWaiting || hasActiveBet}
                   className="auto-input"
                 />
-                <span className="auto-multiplier-x">✨</span>
+                <span className="auto-multiplier-x">x</span>
               </div>
             </div>
           </div>
@@ -285,14 +285,14 @@ const Controls = ({
           <div className="auto-card battle-plan-card">
             <div className="auto-card-header">
               <span className="auto-card-icon">⚔️</span>
-              <h3 className="auto-card-title">Battle Plan</h3>
+              <h3 className="auto-card-title">Session Plan</h3>
             </div>
 
             {/* Number of Bets */}
             <div className="auto-input-group">
               <label className="auto-label">
                 <span className="auto-label-icon">🔢</span>
-                Combat Sorties
+                Number of Bets
               </label>
               <input
                 type="number"
@@ -322,7 +322,7 @@ const Controls = ({
                   <div className="auto-toggle-slider"></div>
                   <span className="auto-toggle-label">
                     <span className="auto-toggle-icon">🏆</span>
-                    Stop on Victory
+                    Stop on Win
                   </span>
                 </label>
                 
@@ -337,7 +337,7 @@ const Controls = ({
                   <div className="auto-toggle-slider"></div>
                   <span className="auto-toggle-label">
                     <span className="auto-toggle-icon">💀</span>
-                    Stop on Defeat
+                    Stop on Loss
                   </span>
                 </label>
               </div>
@@ -360,7 +360,7 @@ const Controls = ({
             className="auto-launch-button"
           >
             <span className="auto-launch-icon">🚀</span>
-            {!hasActiveBet && isWaiting ? 'ACTIVATE AUTO PILOT' : 'AUTO PILOT OFFLINE'}
+            {!hasActiveBet && isWaiting ? 'START AUTO BET' : 'AUTO BET ACTIVE'}
           </button>
         </div>
       )}

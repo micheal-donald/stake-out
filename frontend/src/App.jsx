@@ -62,28 +62,28 @@ const Navbar = ({ isAuthenticated, logout, user }) => {
           <>
             <div className="user-balance">
               <span className="balance-icon">💰</span>
-              Credits: ${parseFloat(user?.balance || 0).toFixed(2)}
+              ${parseFloat(user?.balance || 0).toFixed(2)}
             </div>
             <Link to="/profile" onClick={closeMobileMenu}>
               <span className="nav-icon">🛡️</span>Intel
             </Link>
             <Link to="/wallet" onClick={closeMobileMenu}>
-              <span className="nav-icon">⚙️</span>Arsenal
+              <span className="nav-icon">💵</span>Wallet
             </Link>
             <Link to="/history" onClick={closeMobileMenu}>
-              <span className="nav-icon">⚔️</span>Battle History
+              <span className="nav-icon">⚔️</span>History
             </Link>
             <button onClick={() => { logout(); closeMobileMenu(); }} className="logout-btn">
-              <span className="logout-icon">🚪</span>Disengage
+              <span className="logout-icon">🚪</span>Logout
             </button>
           </>
         ) : (
           <>
             <Link to="/login" onClick={closeMobileMenu}>
-              <span className="nav-icon">🎯</span>Deploy
+              <span className="nav-icon">🎯</span>Login
             </Link>
             <Link to="/register" onClick={closeMobileMenu}>
-              <span className="nav-icon">⭐</span>Enlist
+              <span className="nav-icon">⭐</span>Register
             </Link>
           </>
         )}

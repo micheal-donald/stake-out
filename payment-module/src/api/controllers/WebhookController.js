@@ -19,7 +19,7 @@
 const { providerFactory } = require('../../providers/ProviderFactory');
 const { Transaction } = require('../../database/models/Transaction');
 const { dbConnection } = require('../../database/connection');
-const { paymentEventEmitter } = require('../../events/PaymentEventEmitter');
+const { paymentEvents } = require('../../events/PaymentEventEmitter');
 const PaymentError = require('../../errors/PaymentError');
 const logger = require('../../utils/logger');
 const crypto = require('crypto');
@@ -123,6 +123,34 @@ class WebhookController {
         }
       }
 
+      // Parse M-Pesa transaction date properly
+      let parsedTransactionDate = null;
+      if (transactionDate) {
+        try {
+          // M-Pesa date format is YYYYMMDDHHMMSS
+          const dateStr = transactionDate.toString();
+          if (dateStr.length === 14) {
+            const year = parseInt(dateStr.substring(0, 4));
+            const month = parseInt(dateStr.substring(4, 6)) - 1; // JS months are 0-indexed
+            const day = parseInt(dateStr.substring(6, 8));
+            const hour = parseInt(dateStr.substring(8, 10));
+            const minute = parseInt(dateStr.substring(10, 12));
+            const second = parseInt(dateStr.substring(12, 14));
+            
+            parsedTransactionDate = new Date(year, month, day, hour, minute, second);
+          } else {
+            // Try standard date parsing as fallback
+            parsedTransactionDate = new Date(transactionDate);
+          }
+        } catch (dateError) {
+          logger.warn('Failed to parse transaction date', {
+            transactionDate,
+            error: dateError.message
+          });
+          parsedTransactionDate = new Date(); // Use current date as fallback
+        }
+      }
+
       // Begin transaction to update both tables
       const client = await dbConnection.pool.connect();
       try {
@@ -149,7 +177,7 @@ class WebhookController {
             status === 'completed' ? 'completed' : 'failed',
             mpesaReceiptNumber,
             resultDesc,
-            transactionDate ? new Date(transactionDate.toString()) : null,
+            parsedTransactionDate,
             checkoutRequestId
           ]
         );
@@ -165,7 +193,7 @@ class WebhookController {
         await client.query('COMMIT');
 
         // Emit payment event
-        paymentEventEmitter.emit('payment.status_changed', {
+        paymentEvents.emit('payment.status_changed', {
           transactionId: transaction.transaction_id,
           checkoutRequestId,
           oldStatus: 'pending',

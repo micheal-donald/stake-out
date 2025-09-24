@@ -330,7 +330,7 @@ class PaymentProvider {
  * @property {boolean} success - Whether initiation was successful
  * @property {string} transactionId - Internal transaction ID
  * @property {string} externalReference - Provider's transaction reference
- * @property {string} status - Payment status ('pending', 'completed', 'failed')
+ * @property {string} status - Payment status ('initiated', 'pending', etc.)
  * @property {string} [message] - Human-readable status message
  * @property {Object} [providerData] - Provider-specific response data
  * @property {Date} [expiresAt] - When the payment request expires

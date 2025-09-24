@@ -610,7 +610,7 @@ router.get('/history',
  *     summary: Cancel a pending payment
  *     description: |
  *       Attempts to cancel a payment transaction that is still in progress.
- *       Only transactions in 'pending' status can be cancelled.
+ *       Only transactions in 'initiated' or 'pending' status can be cancelled.
  *     tags:
  *       - Payments
  *     security:

@@ -59,15 +59,15 @@ const STATUS_TRANSITIONS = {
  */
 class Transaction {
   constructor(data = {}) {
-    this.id = data.id || data.transaction_id;
-    this.userId = data.user_id || data.userId;
-    this.transactionType = data.transaction_type || data.transactionType || data.providerType;
+    this.id = data.transaction_id; // Legacy schema uses transaction_id SERIAL
+    this.userId = data.user_id;
+    this.transactionType = data.transaction_type; // Legacy schema field
     this.amount = data.amount;
     this.status = data.status || TRANSACTION_STATUSES.PENDING;
-    this.reference = data.reference_id || data.reference;
+    this.reference = data.reference_id; // Legacy schema field name
     this.description = data.description;
-    this.createdAt = data.created_at || data.createdAt;
-    this.updatedAt = data.updated_at || data.updatedAt;
+    this.createdAt = data.created_at;
+    this.updatedAt = data.updated_at;
   }
 
   /**
@@ -77,9 +77,9 @@ class Transaction {
    * @async
    * @param {Object} transactionData - Transaction data
    * @param {string} transactionData.userId - User ID
-   * @param {string} transactionData.providerType - Payment provider
+   * @param {string} transactionData.transactionType - Transaction type (deposit, withdrawal, bet, win)
    * @param {number} transactionData.amount - Transaction amount
-   * @param {string} transactionData.reference - Unique reference
+   * @param {string} [transactionData.reference] - Unique reference
    * @param {string} [transactionData.description] - Description
    * @returns {Promise<Transaction>} Created transaction
    * @throws {PaymentError} If creation fails
@@ -87,7 +87,7 @@ class Transaction {
   static async create(transactionData) {
     try {
       // Validate required fields
-      const requiredFields = ['userId', 'providerType', 'amount', 'reference'];
+      const requiredFields = ['userId', 'transactionType', 'amount'];
       const missingFields = requiredFields.filter(field => !transactionData[field]);
 
       if (missingFields.length > 0) {
@@ -107,10 +107,12 @@ class Transaction {
         );
       }
 
-      // Check for duplicate reference
-      const existingTransaction = await Transaction.findByReference(transactionData.reference);
-      if (existingTransaction) {
-        throw PaymentError.duplicateTransactionError(transactionData.reference);
+      // Check for duplicate reference if provided
+      if (transactionData.reference) {
+        const existingTransaction = await Transaction.findByReference(transactionData.reference);
+        if (existingTransaction) {
+          throw PaymentError.duplicateTransactionError(transactionData.reference);
+        }
       }
 
       const query = `
@@ -124,7 +126,7 @@ class Transaction {
 
       const values = [
         transactionData.userId,
-        transactionData.providerType,
+        transactionData.transactionType, // Use transactionType instead of providerType
         transactionData.amount,
         TRANSACTION_STATUSES.PENDING,
         transactionData.reference || null,
@@ -290,7 +292,7 @@ class Transaction {
       }
 
       if (provider) {
-        whereConditions.push(`provider_type = $${paramIndex}`);
+        whereConditions.push(`transaction_type = $${paramIndex}`);
         values.push(provider);
         paramIndex++;
       }
@@ -492,31 +494,16 @@ class Transaction {
     const json = {
       id: this.id,
       userId: this.userId,
-      providerType: this.providerType,
+      transactionType: this.transactionType,
       amount: this.amount,
-      currency: this.currency,
       status: this.status,
       reference: this.reference,
       description: this.description,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
-      expiresAt: this.expiresAt,
       isFinal: this.isFinal(),
       duration: this.getDuration()
     };
-
-    if (includeSensitive) {
-      json.metadata = this.metadata;
-    } else {
-      // Include only non-sensitive metadata
-      json.metadata = this.metadata ? {
-        ...this.metadata,
-        // Remove potentially sensitive fields
-        cardNumber: undefined,
-        pin: undefined,
-        password: undefined
-      } : {};
-    }
 
     return json;
   }

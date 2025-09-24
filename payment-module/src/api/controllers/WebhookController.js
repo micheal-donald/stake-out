@@ -7,8 +7,7 @@
  *
  * Features:
  * - Provider-specific webhook processing
- * - Signature verification for security
- * - Transaction status updates
+ * - Transaction status updates using legacy database schema
  * - Event emission for downstream processing
  * - Idempotency handling
  * - Error recovery and retry logic
@@ -19,7 +18,7 @@
 
 const { providerFactory } = require('../../providers/ProviderFactory');
 const { Transaction } = require('../../database/models/Transaction');
-const { PaymentDetail } = require('../../database/models/PaymentDetail');
+const { dbConnection } = require('../../database/connection');
 const { paymentEventEmitter } = require('../../events/PaymentEventEmitter');
 const PaymentError = require('../../errors/PaymentError');
 const logger = require('../../utils/logger');
@@ -47,18 +46,6 @@ class WebhookController {
         resultDesc: webhookData.Body?.stkCallback?.ResultDesc
       });
 
-      // Verify webhook signature if configured
-      if (process.env.MPESA_WEBHOOK_SECRET) {
-        const isValid = WebhookController.verifyMpesaSignature(webhookData, headers);
-        if (!isValid) {
-          throw new PaymentError(
-            'INVALID_WEBHOOK_SIGNATURE',
-            'Invalid webhook signature',
-            'AUTHENTICATION_ERROR'
-          );
-        }
-      }
-
       const stkCallback = webhookData.Body?.stkCallback;
       if (!stkCallback) {
         throw new PaymentError(
@@ -71,10 +58,15 @@ class WebhookController {
       const checkoutRequestId = stkCallback.CheckoutRequestID;
       const resultCode = stkCallback.ResultCode;
       const resultDesc = stkCallback.ResultDesc;
+      const callbackMetadata = stkCallback.CallbackMetadata;
 
-      // Find transaction by provider transaction ID
-      const paymentDetail = await PaymentDetail.findByProviderTransactionId(checkoutRequestId);
-      if (!paymentDetail) {
+      // Find transaction by checkout request ID in legacy schema
+      const transactionResult = await dbConnection.query(
+        'SELECT transaction_id, user_id, amount FROM transactions WHERE reference_id = $1',
+        [checkoutRequestId]
+      );
+
+      if (transactionResult.rows.length === 0) {
         logger.warn('Transaction not found for M-Pesa webhook', {
           checkoutRequestId,
           resultCode
@@ -87,386 +79,144 @@ class WebhookController {
         };
       }
 
-      const transaction = await Transaction.findById(paymentDetail.transactionId);
-      if (!transaction) {
-        throw new PaymentError(
-          'TRANSACTION_NOT_FOUND',
-          'Transaction record not found',
-          'NOT_FOUND',
-          { transactionId: paymentDetail.transactionId }
-        );
-      }
+      const transaction = transactionResult.rows[0];
+      const userId = transaction.user_id;
+      const amount = parseFloat(transaction.amount);
 
-      // Determine new status based on result code
-      let newStatus;
-      let paymentData = {};
+      // Check if already processed (idempotency)
+      const processedResult = await dbConnection.query(
+        'SELECT status FROM transactions WHERE reference_id = $1 AND status = ANY($2)',
+        [checkoutRequestId, ['completed', 'failed']]
+      );
 
-      if (resultCode === 0) {
-        // Success
-        newStatus = 'completed';
-
-        // Extract payment metadata from callback metadata
-        if (stkCallback.CallbackMetadata?.Item) {
-          const metadata = {};
-          stkCallback.CallbackMetadata.Item.forEach(item => {
-            metadata[item.Name] = item.Value;
-          });
-
-          paymentData = {
-            mpesaReceiptNumber: metadata.MpesaReceiptNumber,
-            transactionDate: metadata.TransactionDate,
-            phoneNumber: metadata.PhoneNumber,
-            amount: metadata.Amount
-          };
-        }
-      } else {
-        // Failed or cancelled
-        newStatus = resultCode === 1032 ? 'cancelled' : 'failed';
-      }
-
-      // Check for idempotency - avoid processing same webhook twice
-      if (transaction.status === newStatus) {
-        logger.info('Webhook already processed', {
-          transactionId: transaction.id,
-          currentStatus: transaction.status,
-          webhookStatus: newStatus
+      if (processedResult.rows.length > 0) {
+        logger.info('M-Pesa webhook for already processed transaction', {
+          checkoutRequestId,
+          status: processedResult.rows[0].status
         });
 
         return {
           success: true,
-          message: 'Webhook already processed',
+          message: 'Transaction already processed',
           acknowledged: true
         };
       }
 
-      // Update transaction status
-      await Transaction.update(transaction.id, {
-        status: newStatus,
-        metadata: {
-          ...transaction.metadata,
-          mpesaCallback: {
-            resultCode,
-            resultDesc,
-            processedAt: new Date(),
-            ...paymentData
+      // Extract M-Pesa receipt and other metadata
+      let mpesaReceiptNumber = null;
+      let transactionDate = null;
+      let phoneNumber = null;
+
+      if (callbackMetadata && callbackMetadata.Item) {
+        for (const item of callbackMetadata.Item) {
+          switch (item.Name) {
+            case 'MpesaReceiptNumber':
+              mpesaReceiptNumber = item.Value;
+              break;
+            case 'TransactionDate':
+              transactionDate = item.Value;
+              break;
+            case 'PhoneNumber':
+              phoneNumber = item.Value;
+              break;
           }
-        },
-        updatedAt: new Date()
-      });
-
-      // Update payment detail
-      await PaymentDetail.update(paymentDetail.id, {
-        status: newStatus,
-        providerData: {
-          ...paymentDetail.providerData,
-          callback: stkCallback,
-          processedAt: new Date()
         }
-      });
+      }
 
-      // Emit webhook processed event
-      paymentEventEmitter.emit('webhook.processed', {
-        provider: 'mpesa',
-        transactionId: transaction.id,
-        oldStatus: transaction.status,
-        newStatus,
-        webhookData: stkCallback,
-        paymentData
-      });
+      // Begin transaction to update both tables
+      const client = await dbConnection.pool.connect();
+      try {
+        await client.query('BEGIN');
 
-      // Emit transaction status change event
-      paymentEventEmitter.emit('payment.status_changed', {
-        transactionId: transaction.id,
-        oldStatus: transaction.status,
-        newStatus,
-        provider: 'mpesa',
-        metadata: paymentData
-      });
+        // Determine status based on result code
+        const status = resultCode === 0 ? 'completed' : 'failed';
 
-      logger.info('M-Pesa webhook processed successfully', {
-        transactionId: transaction.id,
-        checkoutRequestId,
-        oldStatus: transaction.status,
-        newStatus,
-        resultCode,
-        resultDesc
-      });
+        // Update transactions table
+        await client.query(
+          `UPDATE transactions
+           SET status = $1, updated_at = NOW()
+           WHERE reference_id = $2`,
+          [status, checkoutRequestId]
+        );
 
-      return {
-        success: true,
-        message: 'Webhook processed successfully',
-        transactionId: transaction.id,
-        status: newStatus,
-        acknowledged: true
-      };
+        // Update mpesa_transactions table
+        await client.query(
+          `UPDATE mpesa_transactions
+           SET stk_status = $1, mpesa_receipt_number = $2, result_desc = $3,
+               transaction_date = $4, last_query_time = NOW()
+           WHERE checkout_request_id = $5`,
+          [
+            status === 'completed' ? 'completed' : 'failed',
+            mpesaReceiptNumber,
+            resultDesc,
+            transactionDate ? new Date(transactionDate.toString()) : null,
+            checkoutRequestId
+          ]
+        );
+
+        // If successful payment, update user balance
+        if (status === 'completed') {
+          await client.query(
+            'UPDATE users SET balance = balance + $1 WHERE user_id = $2',
+            [amount, userId]
+          );
+        }
+
+        await client.query('COMMIT');
+
+        // Emit payment event
+        paymentEventEmitter.emit('payment.status_changed', {
+          transactionId: transaction.transaction_id,
+          checkoutRequestId,
+          oldStatus: 'pending',
+          newStatus: status,
+          amount,
+          userId,
+          mpesaReceiptNumber,
+          resultDesc
+        });
+
+        logger.info('M-Pesa webhook processed successfully', {
+          checkoutRequestId,
+          transactionId: transaction.transaction_id,
+          status,
+          mpesaReceiptNumber,
+          amount,
+          userId
+        });
+
+        return {
+          success: true,
+          message: 'Webhook processed successfully',
+          transactionStatus: status,
+          acknowledged: true
+        };
+
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
 
     } catch (error) {
       logger.error('M-Pesa webhook processing failed', {
-        error: error.message,
-        stack: error.stack,
-        webhookData
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Handle generic provider webhook
-   *
-   * @param {string} provider - Provider name
-   * @param {Object} webhookData - Webhook payload
-   * @param {Object} headers - Request headers
-   * @returns {Promise<Object>} Processing result
-   */
-  static async handleProviderWebhook(provider, webhookData, headers) {
-    try {
-      logger.info('Provider webhook received', {
-        provider,
-        hasPayload: !!webhookData
-      });
-
-      // Get provider instance
-      const paymentProvider = await providerFactory.getProvider(provider);
-      if (!paymentProvider) {
-        throw new PaymentError(
-          'PROVIDER_NOT_AVAILABLE',
-          `Provider '${provider}' not available`,
-          'PROVIDER_ERROR',
-          { provider }
-        );
-      }
-
-      // Verify webhook if provider supports it
-      if (typeof paymentProvider.verifyWebhook === 'function') {
-        const isValid = await paymentProvider.verifyWebhook(webhookData, headers);
-        if (!isValid) {
-          throw new PaymentError(
-            'INVALID_WEBHOOK_SIGNATURE',
-            'Webhook signature verification failed',
-            'AUTHENTICATION_ERROR'
-          );
-        }
-      }
-
-      // Process webhook if provider supports it
-      if (typeof paymentProvider.processWebhook === 'function') {
-        const result = await paymentProvider.processWebhook(webhookData);
-
-        // Update transaction if result contains transaction info
-        if (result.transactionId && result.status) {
-          await WebhookController.updateTransactionFromWebhook(
-            result.transactionId,
-            result.status,
-            result.data || {},
-            provider
-          );
-        }
-
-        return result;
-      }
-
-      // Fallback for providers without webhook processing
-      logger.warn('Provider does not support webhook processing', { provider });
-
-      return {
-        success: true,
-        message: 'Webhook received but not processed',
-        acknowledged: true
-      };
-
-    } catch (error) {
-      logger.error('Provider webhook processing failed', {
-        provider,
+        checkoutRequestId: webhookData.Body?.stkCallback?.CheckoutRequestID,
         error: error.message,
         stack: error.stack
       });
 
-      throw error;
-    }
-  }
-
-  /**
-   * Update transaction status from webhook data
-   *
-   * @param {string} transactionId - Transaction ID
-   * @param {string} newStatus - New status
-   * @param {Object} webhookData - Additional webhook data
-   * @param {string} provider - Provider name
-   * @returns {Promise<void>}
-   * @private
-   */
-  static async updateTransactionFromWebhook(transactionId, newStatus, webhookData, provider) {
-    try {
-      const transaction = await Transaction.findById(transactionId);
-      if (!transaction) {
-        throw new PaymentError(
-          'TRANSACTION_NOT_FOUND',
-          'Transaction not found',
-          'NOT_FOUND',
-          { transactionId }
-        );
+      // Re-throw as PaymentError if not already one
+      if (error instanceof PaymentError) {
+        throw error;
       }
 
-      // Avoid duplicate processing
-      if (transaction.status === newStatus) {
-        logger.debug('Transaction status unchanged', {
-          transactionId,
-          currentStatus: transaction.status
-        });
-        return;
-      }
-
-      // Update transaction
-      await Transaction.update(transactionId, {
-        status: newStatus,
-        metadata: {
-          ...transaction.metadata,
-          webhookUpdate: {
-            provider,
-            updatedAt: new Date(),
-            data: webhookData
-          }
-        },
-        updatedAt: new Date()
-      });
-
-      // Update payment detail
-      const paymentDetail = await PaymentDetail.findByTransactionId(transactionId);
-      if (paymentDetail) {
-        await PaymentDetail.update(paymentDetail.id, {
-          status: newStatus,
-          providerData: {
-            ...paymentDetail.providerData,
-            webhookUpdate: webhookData
-          }
-        });
-      }
-
-      // Emit status change event
-      paymentEventEmitter.emit('payment.status_changed', {
-        transactionId,
-        oldStatus: transaction.status,
-        newStatus,
-        provider,
-        metadata: webhookData
-      });
-
-      logger.info('Transaction updated from webhook', {
-        transactionId,
-        provider,
-        oldStatus: transaction.status,
-        newStatus
-      });
-
-    } catch (error) {
-      logger.error('Failed to update transaction from webhook', {
-        transactionId,
-        provider,
-        newStatus,
-        error: error.message
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Verify M-Pesa webhook signature
-   *
-   * @param {Object} payload - Webhook payload
-   * @param {Object} headers - Request headers
-   * @returns {boolean} Verification result
-   * @private
-   */
-  static verifyMpesaSignature(payload, headers) {
-    try {
-      const signature = headers['x-safaricom-signature'];
-      const secret = process.env.MPESA_WEBHOOK_SECRET;
-
-      if (!signature || !secret) {
-        return false;
-      }
-
-      const expectedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(JSON.stringify(payload))
-        .digest('hex');
-
-      return crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature)
+      throw new PaymentError(
+        'WEBHOOK_PROCESSING_ERROR',
+        `M-Pesa webhook processing failed: ${error.message}`,
+        'INTERNAL_ERROR',
+        { originalError: error.message }
       );
-
-    } catch (error) {
-      logger.error('M-Pesa signature verification failed', {
-        error: error.message
-      });
-      return false;
-    }
-  }
-
-  /**
-   * Handle webhook timeout/failure notifications
-   *
-   * @param {Object} timeoutData - Timeout notification data
-   * @returns {Promise<Object>} Processing result
-   */
-  static async handleWebhookTimeout(timeoutData) {
-    try {
-      logger.warn('Webhook timeout received', timeoutData);
-
-      // Find transaction and mark as timeout if still pending
-      const { transactionId, checkoutRequestId } = timeoutData;
-
-      let transaction;
-      if (transactionId) {
-        transaction = await Transaction.findById(transactionId);
-      } else if (checkoutRequestId) {
-        const paymentDetail = await PaymentDetail.findByProviderTransactionId(checkoutRequestId);
-        if (paymentDetail) {
-          transaction = await Transaction.findById(paymentDetail.transactionId);
-        }
-      }
-
-      if (transaction && ['pending'].includes(transaction.status)) { // Removed 'initiated' since it's not a valid status
-        await Transaction.update(transaction.id, {
-          status: 'failed', // Changed from 'timeout' to 'failed' as 'timeout' is not a valid status
-          metadata: {
-            ...transaction.metadata,
-            timeout: {
-              occurredAt: new Date(),
-              data: timeoutData
-            }
-          },
-          updatedAt: new Date()
-        });
-
-        // Emit timeout event
-        paymentEventEmitter.emit('payment.timeout', {
-          transactionId: transaction.id,
-          provider: transaction.provider,
-          timeoutData
-        });
-
-        logger.info('Transaction marked as timeout', {
-          transactionId: transaction.id
-        });
-      }
-
-      return {
-        success: true,
-        message: 'Timeout processed',
-        acknowledged: true
-      };
-
-    } catch (error) {
-      logger.error('Webhook timeout processing failed', {
-        error: error.message,
-        timeoutData
-      });
-
-      throw error;
     }
   }
 
@@ -489,18 +239,71 @@ class WebhookController {
    * @returns {Promise<Object>} Processing result
    */
   static async processMpesaTimeout(timeoutData, context = {}) {
-    return WebhookController.handleWebhookTimeout(timeoutData);
+    try {
+      const checkoutRequestId = timeoutData.Body?.stkCallback?.CheckoutRequestID;
+
+      if (!checkoutRequestId) {
+        return {
+          success: true,
+          message: 'Invalid timeout notification format',
+          acknowledged: true
+        };
+      }
+
+      logger.info('M-Pesa timeout notification received', {
+        checkoutRequestId
+      });
+
+      // Update transaction status to failed due to timeout
+      await dbConnection.query(
+        `UPDATE transactions
+         SET status = 'failed', updated_at = NOW()
+         WHERE reference_id = $1 AND status = 'pending'`,
+        [checkoutRequestId]
+      );
+
+      // Update mpesa_transactions table
+      await dbConnection.query(
+        `UPDATE mpesa_transactions
+         SET stk_status = 'timeout', result_desc = 'STK Push timeout'
+         WHERE checkout_request_id = $1`,
+        [checkoutRequestId]
+      );
+
+      return {
+        success: true,
+        message: 'Timeout notification processed',
+        acknowledged: true
+      };
+
+    } catch (error) {
+      logger.error('M-Pesa timeout processing failed', {
+        error: error.message,
+        timeoutData
+      });
+
+      throw new PaymentError(
+        'TIMEOUT_PROCESSING_ERROR',
+        `Timeout processing failed: ${error.message}`,
+        'INTERNAL_ERROR',
+        { originalError: error.message }
+      );
+    }
   }
 
   /**
-   * Process Stripe webhook callback
+   * Process Stripe webhook callback (placeholder for future implementation)
    *
    * @param {Object} webhookData - Webhook payload
    * @param {Object} context - Processing context
    * @returns {Promise<Object>} Processing result
    */
   static async processStripeCallback(webhookData, context = {}) {
-    return WebhookController.handleProviderWebhook('stripe', webhookData, context.headers || {});
+    throw new PaymentError(
+      'PROVIDER_NOT_IMPLEMENTED',
+      'Stripe webhooks not yet implemented',
+      'NOT_FOUND'
+    );
   }
 
   /**
@@ -531,63 +334,49 @@ class WebhookController {
         webhookData
       });
 
-      throw error;
+      throw new PaymentError(
+        'TEST_WEBHOOK_ERROR',
+        `Test webhook processing failed: ${error.message}`,
+        'INTERNAL_ERROR',
+        { originalError: error.message }
+      );
     }
   }
 
   /**
-   * Get webhook health status
+   * Get webhook system health status
    *
-   * @returns {Promise<Object>} Health status
+   * @returns {Promise<Object>} Health status information
    */
   static async getWebhookHealth() {
     try {
       return {
-        success: true,
-        status: 'healthy',
-        endpoints: {
-          'mpesa/callback': 'active',
-          'mpesa/timeout': 'active',
-          'stripe/callback': 'ready',
-          'test': process.env.NODE_ENV === 'development' ? 'active' : 'disabled'
+        providers: {
+          mpesa: {
+            enabled: true,
+            status: 'active'
+          },
+          stripe: {
+            enabled: false,
+            status: 'not_implemented'
+          }
         },
-        lastProcessed: null,
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString()
+        database: {
+          connected: dbConnection.isConnected
+        },
+        lastCheck: new Date().toISOString()
       };
     } catch (error) {
-      logger.error('Failed to get webhook health', {
+      logger.error('Webhook health check failed', {
         error: error.message
       });
 
-      throw error;
-    }
-  }
-
-  /**
-   * Get webhook processing statistics
-   *
-   * @returns {Promise<Object>} Webhook statistics
-   */
-  static async getWebhookStats() {
-    try {
-      // This would typically query a webhook processing log table
-      // For now, return basic stats
-      return {
-        success: true,
-        stats: {
-          totalProcessed: 0,
-          successfullyProcessed: 0,
-          failed: 0,
-          lastProcessedAt: null
-        }
-      };
-    } catch (error) {
-      logger.error('Failed to get webhook stats', {
-        error: error.message
-      });
-
-      throw error;
+      throw new PaymentError(
+        'HEALTH_CHECK_ERROR',
+        `Health check failed: ${error.message}`,
+        'INTERNAL_ERROR',
+        { originalError: error.message }
+      );
     }
   }
 }

@@ -5,8 +5,42 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const router = express.Router();
 
+// Simple rate limiting middleware for auth endpoints
+const rateLimit = (windowMs, max) => {
+  const requests = new Map();
+  
+  return (req, res, next) => {
+    const ip = req.ip || req.connection.remoteAddress;
+    const windowKey = `${ip}-${Math.floor(Date.now() / windowMs)}`;
+    const current = requests.get(windowKey) || 0;
+    
+    if (current >= max) {
+      return res.status(429).json({ error: 'Too many requests, please try again later' });
+    }
+    
+    requests.set(windowKey, current + 1);
+    
+    // Clean up old entries periodically
+    if (Math.random() < 0.1) { // 10% chance to clean up
+      const now = Date.now();
+      for (const [key] of requests.entries()) {
+        const keyTime = parseInt(key.split('-')[1]);
+        if (now - (keyTime * windowMs) > windowMs) {
+          requests.delete(key);
+        }
+      }
+    }
+    
+    next();
+  };
+};
+
+// Apply rate limiting to auth endpoints
+const loginLimiter = rateLimit(15 * 60 * 1000, 5); // 5 attempts per 15 minutes
+const registerLimiter = rateLimit(15 * 60 * 1000, 3); // 3 attempts per 15 minutes
+
 // User Registration
-router.post('/register', async (req, res) => {
+router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { username, email, password } = req.body;
     
@@ -52,7 +86,7 @@ router.post('/register', async (req, res) => {
 });
 
 // User Login
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     
@@ -100,7 +134,15 @@ router.post('/login', async (req, res) => {
       [user.user_id, token, expiresAt]
     );
     
-    // Return user info and token
+    // Set httpOnly cookie instead of returning token in response
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'strict'
+    });
+    
+    // Return user info (without token)
     res.json({
       message: 'Login successful',
       user: {
@@ -109,8 +151,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         balance: user.balance,
         account_status: user.account_status
-      },
-      token
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -124,10 +165,10 @@ router.post('/logout', authenticateToken, async (req, res) => {
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
       
-      // Remove session from database
+      // Remove session from database using user ID instead of token
       await pool.query(
-        'DELETE FROM sessions WHERE session_token = $1',
-        [token]
+        'DELETE FROM sessions WHERE user_id = $1',
+        [req.user.userId]
       );
       
       res.json({ message: 'Logout successful' });

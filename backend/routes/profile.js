@@ -7,64 +7,49 @@ const router = express.Router();
 // Get User Profile
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId;
-    
-    // Get user profile
-    const userResult = await pool.query(
+    const result = await pool.query(
       'SELECT user_id, username, email, balance, account_status, created_at FROM users WHERE user_id = $1',
-      [userId]
+      [req.user.userId]
     );
-    
-    if (userResult.rows.length === 0) {
+
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
-    
-    // Get user settings
-    const settingsResult = await pool.query(
-      'SELECT auto_cashout_multiplier, auto_cashout_amount FROM user_settings WHERE user_id = $1',
-      [userId]
-    );
-    
-    // Get bet history summary
-    const betHistoryResult = await pool.query(
-      'SELECT COUNT(*) as total_bets, SUM(winnings) as total_winnings FROM bet_history WHERE user_id = $1',
-      [userId]
-    );
-    
+
     res.json({
-      user: userResult.rows[0],
-      settings: settingsResult.rows[0] || {},
-      betSummary: betHistoryResult.rows[0] || { total_bets: 0, total_winnings: 0 }
+      user: result.rows[0]
     });
   } catch (error) {
-    console.error('Profile error:', error);
-    res.status(500).json({ error: 'Server error fetching profile' });
+    console.error('Profile fetch error:', error);
+    res.status(500).json({ error: 'Server error while fetching profile' });
   }
 });
 
 // Update User Profile
 router.put('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId;
     const { email } = req.body;
-    
+
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
-    
-    // Update user profile
+
     const result = await pool.query(
-      'UPDATE users SET email = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2 RETURNING user_id, username, email, account_status',
-      [email, userId]
+      'UPDATE users SET email = $1 WHERE user_id = $2 RETURNING user_id, username, email, balance, account_status, created_at',
+      [email, req.user.userId]
     );
-    
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     res.json({
       message: 'Profile updated successfully',
       user: result.rows[0]
     });
   } catch (error) {
     console.error('Profile update error:', error);
-    res.status(500).json({ error: 'Server error updating profile' });
+    res.status(500).json({ error: 'Server error while updating profile' });
   }
 });
 

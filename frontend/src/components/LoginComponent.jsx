@@ -30,27 +30,15 @@ const LoginComponent = () => {
     setLoading(true);
     
     try {
-      const res = await axios.post('http://localhost:4000/api/login', {
-        username,
-        password
-      });
+      const result = await authContext.login(username, password);
       
-      if (authContext && authContext.login) {
-        // Use context's login function if available
-        authContext.login(res.data.token, res.data.user);
+      if (result.success) {
         navigate('/');
       } else {
-        // Fallback to direct localStorage manipulation
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`;
-        
-        // Use window.location.href for a full page reload as a backup
-        window.location.href = '/';
+        setError(result.error);
       }
-      
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please check your credentials.');
+      setError('Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }

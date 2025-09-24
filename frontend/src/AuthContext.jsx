@@ -10,33 +10,21 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for stored token and user data on initial load
+  // Check authentication status on initial load
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
-      
-      if (token && storedUser) {
-        // Set axios default header
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      try {
+        // Check authentication status using httpOnly cookie
+        const res = await axios.get('http://localhost:4000/api/profile');
         
-        try {
-          // Verify token validity with a backend call
-          const res = await axios.get('http://localhost:4000/api/profile', {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          
-          // Update user with latest data
-          setUser(res.data.user);
-          setIsAuthenticated(true);
-        } catch (error) {
-          // Token is invalid or expired
-          console.error('Authentication error:', error);
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setIsAuthenticated(false);
-          setUser(null);
-        }
+        // Update user with latest data
+        setUser(res.data.user);
+        setIsAuthenticated(true);
+      } catch (error) {
+        // Not authenticated (cookie missing or invalid)
+        console.error('Authentication error:', error);
+        setIsAuthenticated(false);
+        setUser(null);
       }
       
       setLoading(false);
@@ -46,34 +34,36 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function
-  const login = (token, userData) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
-    
-    // Set axios default header
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    
-    setUser(userData);
-    setIsAuthenticated(true);
+  const login = async (username, password) => {
+    try {
+      const res = await axios.post('http://localhost:4000/api/login', {
+        username,
+        password
+      });
+      
+      // User data will be in the response
+      setUser(res.data.user);
+      setIsAuthenticated(true);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Login error:', error);
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Login failed' 
+      };
+    }
   };
 
   // Logout function
   const logout = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        // Notify the server about logout
-        await axios.post('http://localhost:4000/api/logout', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
+      // Notify the server about logout (clears the httpOnly cookie)
+      await axios.post('http://localhost:4000/api/logout');
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear local storage and state
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      delete axios.defaults.headers.common['Authorization'];
+      // Clear state (cookie cleared by server)
       setIsAuthenticated(false);
       setUser(null);
     }
@@ -84,7 +74,6 @@ export const AuthProvider = ({ children }) => {
     if (user) {
       const updatedUser = { ...user, balance: newBalance };
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
     }
   };
 
@@ -93,7 +82,6 @@ export const AuthProvider = ({ children }) => {
     if (user) {
       const updatedUser = { ...user, ...updatedData };
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
     }
   };
 

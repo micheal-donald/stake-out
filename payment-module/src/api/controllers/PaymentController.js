@@ -79,6 +79,23 @@ class PaymentController {
         description: transaction.description
       });
 
+      // Create M-Pesa specific record for compatibility with legacy system
+      if (provider === 'mpesa' && providerResponse.success && providerResponse.externalReference) {
+        const { dbConnection } = require('../../database/connection');
+        await dbConnection.query(
+          `INSERT INTO mpesa_transactions
+          (transaction_id, checkout_request_id, phone_number, stk_status, last_query_time)
+          VALUES ($1, $2, $3, $4, $5)`,
+          [
+            transaction.id,
+            providerResponse.externalReference, // CheckoutRequestID from M-Pesa
+            phoneNumber,
+            'initiated',
+            new Date()
+          ]
+        );
+      }
+
       // Emit payment initiated event
       paymentEventEmitter.emit('payment.initiated', {
         transactionId: transaction.id,

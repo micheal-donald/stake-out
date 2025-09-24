@@ -9,7 +9,6 @@
  * @since 1.0.0
  */
 
-const PaymentModuleClient = require('./paymentModuleClient');
 const pool = require('../config/db');
 
 /**
@@ -31,8 +30,8 @@ class PaymentAdapter {
       ...config
     };
 
-    // Initialize payment module client
-    this.paymentClient = new PaymentModuleClient(config.paymentModule);
+    // Since payment module now uses same database as legacy, no separate client needed
+    this.paymentClient = null;
 
     // Legacy service for fallback (if needed)
     this.legacyService = config.legacyService;
@@ -55,7 +54,12 @@ class PaymentAdapter {
     }
 
     try {
-      return await this.paymentClient.isAvailable();
+      // Check if payment module is running by making a health check
+      const response = await fetch(`${this.config.paymentModuleUrl}/health`, {
+        method: 'GET',
+        timeout: 3000
+      });
+      return response.ok;
     } catch (error) {
       console.warn('Payment module availability check failed:', error.message);
       return false;
@@ -105,25 +109,15 @@ class PaymentAdapter {
    * @private
    */
   async initiateSTKPushViaModule(phoneNumber, amount, accountReference) {
-    // Extract user ID from account reference
-    const userIdMatch = accountReference.match(/STAKEOUT(\d+)/);
-    const userId = userIdMatch ? userIdMatch[1] : null;
+    // Since payment module uses same database, delegate to legacy service
+    // The payment module will create records in the same tables
+    console.log('Payment module available - delegating to legacy service since same database');
 
-    const paymentResponse = await this.paymentClient.initiatePayment({
-      phoneNumber,
-      amount,
-      userId,
-      description: `StakeOut Bet Deposit - ${accountReference}`
-    });
+    if (this.legacyService) {
+      return await this.legacyService.initiateSTKPush(phoneNumber, amount, accountReference);
+    }
 
-    // Return in legacy format for backward compatibility
-    return {
-      ResponseCode: '0',
-      ResponseDescription: 'Accept the service request successfully.',
-      CheckoutRequestID: paymentResponse.checkoutRequestId,
-      MerchantRequestID: paymentResponse.transactionId,
-      CustomerMessage: paymentResponse.message
-    };
+    throw new Error('No payment service configured');
   }
 
   /**
@@ -195,16 +189,14 @@ class PaymentAdapter {
       try {
         console.log('Checking status via payment module');
 
-        // Use checkoutRequestId directly since both systems use the same database
-        const statusResponse = await this.paymentClient.checkPaymentStatus(checkoutRequestId);
+        // Since both systems use same database, delegate to legacy service
+        console.log('Payment module available - using legacy service for status check since same database');
 
-        // Convert to legacy format
-        return {
-          ResponseCode: statusResponse.success ? '0' : '1',
-          ResponseDescription: 'The service request has been accepted successfully.',
-          ResultCode: statusResponse.status === 'completed' ? '0' : '1',
-          ResultDesc: this.mapStatusToDescription(statusResponse.status)
-        };
+        if (this.legacyService) {
+          return await this.legacyService.querySTKStatus(checkoutRequestId);
+        }
+
+        throw new Error('No payment service configured');
       } catch (error) {
         console.error('Payment module status check failed:', error);
 
@@ -267,21 +259,15 @@ class PaymentAdapter {
 
     if (paymentModuleAvailable) {
       try {
-        const response = await this.paymentClient.getUserPayments(userId, {
-          status: 'pending',
-          limit: 50
-        });
+        // Since both systems now use same database, query directly with legacy service
+        // The payment module stores data in the same transactions/mpesa_transactions tables
+        console.log('Payment module available - using legacy service for transaction query since same database');
 
-        // Convert to legacy format
-        return response.transactions.map(transaction => ({
-          transaction_id: transaction.id,
-          checkout_request_id: transaction.providerTransactionId,
-          amount: transaction.amount,
-          phone_number: transaction.phoneNumber,
-          stk_status: this.mapStatusToLegacyStatus(transaction.status),
-          created_at: transaction.createdAt,
-          expires_at: transaction.expiresAt
-        }));
+        if (this.legacyService) {
+          return await this.legacyService.getPendingTransactionsForUser(userId);
+        }
+
+        return [];
       } catch (error) {
         console.error('Failed to get pending transactions from payment module:', error);
 
@@ -330,7 +316,12 @@ class PaymentAdapter {
 
     if (paymentModuleAvailable) {
       try {
-        return await this.paymentClient.cancelPayment(transactionId, userId);
+        // Since both systems use same database, delegate to legacy service
+        if (this.legacyService) {
+          return await this.legacyService.cancelTransaction(transactionId, userId);
+        }
+
+        throw new Error('No payment service configured');
       } catch (error) {
         console.error('Payment module cancellation failed:', error);
 
@@ -371,9 +362,7 @@ class PaymentAdapter {
    * Gracefully shutdown the adapter
    */
   async shutdown() {
-    if (this.paymentClient) {
-      await this.paymentClient.close();
-    }
+    // Since we're using legacy service, no additional cleanup needed
     console.log('Payment adapter shutdown complete');
   }
 }

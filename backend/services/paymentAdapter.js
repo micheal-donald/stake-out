@@ -10,7 +10,7 @@
  */
 
 const pool = require('../config/db');
-const fetch = require('node-fetch');
+const axios = require('axios');
 
 /**
  * Payment Adapter for StakeOut Application
@@ -59,11 +59,10 @@ class PaymentAdapter {
 
     try {
       // Check if payment module is running by making a health check
-      const response = await fetch(`${this.config.paymentModuleUrl}/health`, {
-        method: 'GET',
+      const response = await axios.get(`${this.config.paymentModuleUrl}/health`, {
         timeout: 3000
       });
-      return response.ok;
+      return response.status === 200;
     } catch (error) {
       console.warn('Payment module availability check failed:', error.message);
       return false;
@@ -167,21 +166,18 @@ class PaymentAdapter {
         // The payment module will handle the processing and update the same database
         console.log('Forwarding callback to payment module');
         
-        const response = await fetch(`${this.config.paymentModuleUrl}/api/webhooks/mpesa/callback`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-API-Key': this.config.paymentModuleApiKey,
-            // Add timestamp header to avoid the warning
-            'x-webhook-timestamp': Math.floor(Date.now() / 1000).toString()
-          },
-          body: JSON.stringify(callbackData),
-          timeout: this.config.paymentModuleTimeout
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Payment module returned ${response.status}: ${response.statusText}`);
-        }
+        const response = await axios.post(`${this.config.paymentModuleUrl}/api/webhooks/mpesa/callback`,
+          callbackData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': this.config.paymentModuleApiKey,
+              // Add timestamp header to avoid the warning
+              'x-webhook-timestamp': Math.floor(Date.now() / 1000).toString()
+            },
+            timeout: this.config.paymentModuleTimeout
+          }
+        );
         
         return { success: true, message: 'Callback forwarded to payment module' };
       } catch (error) {

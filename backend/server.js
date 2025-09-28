@@ -3,6 +3,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const pool = require('./config/db');
 require('dotenv').config();
 
 // Import routes
@@ -74,6 +75,20 @@ const gameServer = new GameServer(io);
 
 // Setup WebSocket handlers
 setupSocketHandlers(io, gameServer);
+
+// Periodic cleanup of expired sessions
+setInterval(async () => {
+  try {
+    const result = await pool.query(
+      'DELETE FROM sessions WHERE expires_at < NOW()'
+    );
+    if (result.rowCount > 0) {
+      console.log(`Cleaned up ${result.rowCount} expired sessions`);
+    }
+  } catch (error) {
+    console.error('Error cleaning up expired sessions:', error);
+  }
+}, 60 * 60 * 1000); // Run every hour
 
 // Start server
 const PORT = process.env.PORT || 4000;

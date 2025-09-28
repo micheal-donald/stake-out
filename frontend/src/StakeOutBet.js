@@ -1,7 +1,8 @@
 // Updated StakeOutBet.js with fixes for cash out functionality
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useContext } from 'react';
 import { Clock, AlertTriangle, RefreshCw, InfoIcon } from 'lucide-react';
 import io from 'socket.io-client';
+import { AuthContext } from './AuthContext';
 
 // Import helper functions - only for rendering, not for game logic
 import { 
@@ -41,6 +42,9 @@ import {
 const SOCKET_SERVER_URL = 'http://localhost:4000';
 
 const StakeOutBet = () => {
+  // Auth context
+  const { isAuthenticated, user: authUser, updateUserBalance } = useContext(AuthContext);
+
   // Game state from server
   const [gameState, setGameState] = useState('connecting');
   const [countdown, setCountdown] = useState(0);
@@ -56,7 +60,7 @@ const StakeOutBet = () => {
   
   // User state
   const [user, setUser] = useState(null);
-  const [balance, setBalance] = useState(0);
+  const [balance, setBalance] = useState(parseFloat(authUser?.balance) || 0);
   const [bet, setBet] = useState(100);
   const [autoCashout, setAutoCashout] = useState(0);
   const [autoCashoutAmount, setAutoCashoutAmount] = useState(0);
@@ -107,17 +111,37 @@ const StakeOutBet = () => {
   
   // Initialize socket connection
   useEffect(() => {
-    // Get token from localStorage
-    const token = localStorage.getItem('token');
-    const userData = JSON.parse(localStorage.getItem('user') || '{}');
-    
-    if (token) {
-      setUser(userData);
-      setBalance(parseFloat(userData.balance) || 0);
-      
+    if (!isAuthenticated) return;
+
+    // Get fresh socket token from backend
+    const getSocketToken = async () => {
+      try {
+        const response = await fetch('http://localhost:4000/api/socket-token', {
+          credentials: 'include' // Include httpOnly cookies
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get socket token');
+        }
+
+        const data = await response.json();
+        return data.token;
+      } catch (error) {
+        console.error('Error getting socket token:', error);
+        return null;
+      }
+    };
+
+    const initializeSocket = async () => {
+      const token = await getSocketToken();
+      if (!token) {
+        console.error('No socket token available');
+        return;
+      }
+
       // Connect to the server
       socketRef.current = io(SOCKET_SERVER_URL);
-      
+
       // Handle connection
       socketRef.current.on('connect', () => {
         console.log('Connected to server');
@@ -128,9 +152,24 @@ const StakeOutBet = () => {
       // Handle authentication response
       socketRef.current.on('authenticated', (userData) => {
         console.log('Authenticated:', userData);
-        setBalance(parseFloat(userData.balance) || 0);
+        const newBalance = parseFloat(userData.balance) || 0;
+        setBalance(newBalance);
+        updateUserBalance(newBalance);
       });
-      
+
+      // Handle authentication errors (token expired)
+      socketRef.current.on('authentication_error', async (errorMsg) => {
+        console.error('Socket authentication error:', errorMsg);
+        if (errorMsg.includes('expired') || errorMsg.includes('Invalid token')) {
+          console.log('Token expired, attempting to refresh...');
+          // Try to get a new token and reconnect
+          const newToken = await getSocketToken();
+          if (newToken && socketRef.current.connected) {
+            socketRef.current.emit('authenticate', newToken);
+          }
+        }
+      });
+
       // Handle active bet notification
       socketRef.current.on('active_bet', (betData) => {
         console.log('Active bet received:', betData);
@@ -209,6 +248,7 @@ const StakeOutBet = () => {
         console.log('Bet result:', data);
         if (data.success) {
           setBalance(data.balance);
+          updateUserBalance(data.balance);
           setHasActiveBet(true);
           setCurrentBetAmount(data.bet.amount); // Store the actual bet amount
           setError('');
@@ -227,6 +267,7 @@ const StakeOutBet = () => {
         console.log('Cashout result:', data);
         if (data.success) {
           setBalance(data.newBalance);
+          updateUserBalance(data.newBalance);
           setWinnings(data.winnings);
           setHasActiveBet(false);
           setCashoutTrigger(data.trigger || 'manual');
@@ -248,24 +289,24 @@ const StakeOutBet = () => {
       
       // Load game history on connect
       fetchGameHistory();
-    }
-    
+    };
+
+    // Initialize socket connection
+    initializeSocket();
+
     // Cleanup on unmount
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
       }
     };
-  }, []);
+  }, [isAuthenticated]);
   
   // Fetch game history from API
   const fetchGameHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
       const response = await fetch('http://localhost:4000/api/game/history?limit=10', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include' // Include httpOnly cookies
       });
       
       if (response.ok) {
@@ -437,15 +478,26 @@ const StakeOutBet = () => {
           </div>
           
           {/* Game Info */}
-          <div className="flex justify-between text-sm mb-md">
-            <div>Game #{gameId || '—'}</div>
-            <div>Active Players: {activePlayers}</div>
-            <div>Balance: ${balance.toFixed(2)}</div>
+          <div className="compact-game-info">
+            <div className="info-group">
+              <span className="info-label">Game:</span>
+              <span className="info-value">#{gameId || '—'}</span>
+            </div>
+            <div className="info-group">
+              <span className="info-label">Players:</span>
+              <span className="info-value">{activePlayers}</span>
+            </div>
+            <div className="info-group">
+              <span className="info-label">Balance:</span>
+              <span className="info-value">${(parseFloat(balance) || 0).toFixed(2)}</span>
+            </div>
           </div>
           
           {/* Debug Info - Remove in production */}
-          <div className="text-xs text-gray-500 mb-2">
-            State: {gameState} | Has Bet: {hasActiveBet ? 'Yes' : 'No'} | Bet Amount: {currentBetAmount}
+          <div className="compact-debug-info">
+            <span className="debug-text">
+              State: {gameState} | Bet: {hasActiveBet ? 'Yes' : 'No'} | Amount: {currentBetAmount}
+            </span>
           </div>
           
           {/* Controls */}

@@ -1,7 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../AuthContext';
 
 const BetHistoryComponent = () => {
+  const { isAuthenticated } = useContext(AuthContext);
+  const navigate = useNavigate();
+
   const [bets, setBets] = useState([]);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -12,20 +17,21 @@ const BetHistoryComponent = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
   // Load bet history on component mount and when page changes
   useEffect(() => {
     const fetchBetHistory = async () => {
       try {
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          throw new Error('Not authenticated');
-        }
-        
+        if (!isAuthenticated) return;
+
         const res = await axios.get(`http://localhost:4000/api/bet/history?page=${pagination.currentPage}&limit=10`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          withCredentials: true
         });
         
         setBets(res.data.bets);
@@ -39,7 +45,7 @@ const BetHistoryComponent = () => {
     };
 
     fetchBetHistory();
-  }, [pagination.currentPage]);
+  }, [pagination.currentPage, isAuthenticated]);
 
   const handlePageChange = (newPage) => {
     if (newPage > 0 && newPage <= pagination.totalPages) {

@@ -24,7 +24,7 @@ import '../style/WalletComponent.css';
 
 const WalletComponent = () => {
   const context = useContext(AuthContext) || {};
-  const { user, updateUserBalance } = context;
+  const { user, updateUserBalance, isAuthenticated } = context;
 
   const [balance, setBalance] = useState(0);
   const [depositAmount, setDepositAmount] = useState('');
@@ -53,32 +53,38 @@ const WalletComponent = () => {
 
   const navigate = useNavigate();
 
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
   // Load wallet data on component mount
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     fetchWalletData();
-    
+
     // Set up interval to check for pending transactions every 30 seconds
     const interval = setInterval(() => {
       fetchPendingTransactions();
     }, 30000);
-    
+
     // Clean up interval on unmount
     return () => clearInterval(interval);
-  }, [user, navigate]);
+  }, [isAuthenticated, user]);
 
   // Function to fetch wallet balance and transaction data
   const fetchWalletData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return navigate('/login');
-
       setLoading(true);
       // Get balance from user context if available, otherwise fetch it
       if (user) {
         setBalance(parseFloat(user.balance) || 0);
       } else {
         const res = await axios.get('http://localhost:4000/api/wallet/balance', {
-          headers: { Authorization: `Bearer ${token}` }
+          withCredentials: true
         });
         setBalance(parseFloat(res.data.balance) || 0);
       }
@@ -98,11 +104,8 @@ const WalletComponent = () => {
   const fetchTransactions = async (page = 1) => {
     setTransactionsLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return navigate('/login');
-
       const res = await axios.get(`http://localhost:4000/api/wallet/transactions?page=${page}&limit=10`, {
-        headers: { Authorization: `Bearer ${token}` }
+        withCredentials: true
       });
 
       setTransactions(res.data.transactions);
@@ -117,12 +120,9 @@ const WalletComponent = () => {
   // Function to fetch pending M-Pesa transactions
   const fetchPendingTransactions = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
       setPendingLoading(true);
       const res = await axios.get('http://localhost:4000/api/mpesa/pending-transactions', {
-        headers: { Authorization: `Bearer ${token}` }
+        withCredentials: true
       });
 
       setPendingTransactions(res.data.transactions || []);
@@ -153,9 +153,8 @@ const WalletComponent = () => {
   // Refresh just the balance
   const refreshBalance = async () => {
     try {
-      const token = localStorage.getItem('token');
       const res = await axios.get('http://localhost:4000/api/wallet/balance', {
-        headers: { Authorization: `Bearer ${token}` }
+        withCredentials: true
       });
       
       const newBalance = parseFloat(res.data.balance) || 0;
@@ -194,10 +193,9 @@ const WalletComponent = () => {
 
     setProcessingDeposit(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('http://localhost:4000/api/mpesa/stk-push', 
-        { amount, phoneNumber: mpesaPhone }, 
-        { headers: { Authorization: `Bearer ${token}` }}
+      const res = await axios.post('http://localhost:4000/api/mpesa/stk-push',
+        { amount, phoneNumber: mpesaPhone },
+        { withCredentials: true }
       );
 
       // Set success message with transaction ID
@@ -230,9 +228,8 @@ const WalletComponent = () => {
           : tx
       ));
       
-      const token = localStorage.getItem('token');
       const res = await axios.get(`http://localhost:4000/api/mpesa/transaction-status/${checkoutRequestId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        withCredentials: true
       });
       
       // Update the transaction status in the list
@@ -278,9 +275,8 @@ const WalletComponent = () => {
   // Cancel a transaction
   const cancelTransaction = async (transactionId) => {
     try {
-      const token = localStorage.getItem('token');
       await axios.post(`http://localhost:4000/api/mpesa/cancel-transaction/${transactionId}`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
+        withCredentials: true
       });
       
       // Update the transaction in the list
@@ -307,9 +303,8 @@ const WalletComponent = () => {
   const checkAllPendingTransactions = async () => {
     try {
       setCheckingAll(true);
-      const token = localStorage.getItem('token');
       await axios.post('http://localhost:4000/api/mpesa/check-pending', {}, {
-        headers: { Authorization: `Bearer ${token}` }
+        withCredentials: true
       });
       
       // Refresh data
@@ -335,10 +330,9 @@ const WalletComponent = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('http://localhost:4000/api/wallet/deposit', 
-        { amount }, 
-        { headers: { Authorization: `Bearer ${token}` }}
+      const res = await axios.post('http://localhost:4000/api/wallet/deposit',
+        { amount },
+        { withCredentials: true }
       );
 
       const newBalance = parseFloat(res.data.user.balance);
@@ -365,10 +359,9 @@ const WalletComponent = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('http://localhost:4000/api/wallet/withdraw', 
-        { amount }, 
-        { headers: { Authorization: `Bearer ${token}` }}
+      const res = await axios.post('http://localhost:4000/api/wallet/withdraw',
+        { amount },
+        { withCredentials: true }
       );
 
       const newBalance = parseFloat(res.data.user.balance);
@@ -663,7 +656,7 @@ const WalletComponent = () => {
             placeholder="Enter withdrawal amount" 
           />
         </div>
-        <div className="input-hint">Available balance: ${balance.toFixed(2)}</div>
+        <div className="input-hint">Available balance: ${(parseFloat(balance) || 0).toFixed(2)}</div>
       </div>
       <button 
         className="withdraw-button" 
@@ -688,7 +681,7 @@ const WalletComponent = () => {
 
       <div className="balance-display">
         <h3>Current Balance</h3>
-        <div className="balance-amount">${balance.toFixed(2)}</div>
+        <div className="balance-amount">${(parseFloat(balance) || 0).toFixed(2)}</div>
         <button className="refresh-balance" onClick={refreshWallet} title="Refresh wallet data">
           <RefreshCw size={16} />
         </button>

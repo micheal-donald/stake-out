@@ -12,12 +12,12 @@ import { AuthContext, AuthProvider } from './AuthContext';
 
 // Authentication guard component
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  
-  if (!token) {
+  const { isAuthenticated } = useContext(AuthContext);
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
 };
 
@@ -52,12 +52,12 @@ const Navbar = ({ isAuthenticated, logout, user }) => {
 
 // Home/Dashboard component
 const Dashboard = () => {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
-  
+  const { user } = useContext(AuthContext);
+
   return (
     <div className="dashboard">
-      <h2>Welcome, {user.username}!</h2>
-      <p>Your balance: ${parseFloat(user.balance || 0).toFixed(2)}</p>
+      <h2>Welcome, {user?.username}!</h2>
+      <p>Your balance: ${parseFloat(user?.balance || 0).toFixed(2)}</p>
       
       <div className="dashboard-actions">
         <Link to="/profile" className="dashboard-card">

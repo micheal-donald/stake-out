@@ -162,20 +162,40 @@ router.post('/login', loginLimiter, async (req, res) => {
 // User Logout
 router.post('/logout', authenticateToken, async (req, res) => {
     try {
-      const authHeader = req.headers['authorization'];
-      const token = authHeader && authHeader.split(' ')[1];
-      
-      // Remove session from database using user ID instead of token
+      // Remove session from database
       await pool.query(
         'DELETE FROM sessions WHERE user_id = $1',
         [req.user.userId]
       );
       
+      // Clear the cookie with the same options it was set with
+      res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+      });
       res.json({ message: 'Logout successful' });
     } catch (error) {
       console.error('Logout error:', error);
       res.status(500).json({ error: 'Server error during logout' });
     }
   });
+
+// Get token for socket authentication
+router.get('/socket-token', authenticateToken, async (req, res) => {
+  try {
+    // Generate a short-lived token for socket authentication
+    const socketToken = jwt.sign(
+      { userId: req.user.userId },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' } // Shorter expiry for socket tokens
+    );
+
+    res.json({ token: socketToken });
+  } catch (error) {
+    console.error('Socket token error:', error);
+    res.status(500).json({ error: 'Failed to generate socket token' });
+  }
+});
 
 module.exports = router;

@@ -15,7 +15,9 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       try {
         // Check authentication status using httpOnly cookie
-        const res = await axios.get('http://localhost:4000/api/profile');
+        const res = await axios.get('http://localhost:4000/api/profile', {
+          withCredentials: true
+        });
         
         // Update user with latest data
         setUser(res.data.user);
@@ -39,6 +41,8 @@ export const AuthProvider = ({ children }) => {
       const res = await axios.post('http://localhost:4000/api/login', {
         username,
         password
+      }, {
+        withCredentials: true
       });
       
       // User data will be in the response
@@ -59,7 +63,9 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       // Notify the server about logout (clears the httpOnly cookie)
-      await axios.post('http://localhost:4000/api/logout');
+      await axios.post('http://localhost:4000/api/logout', {}, {
+        withCredentials: true
+      });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -72,7 +78,7 @@ export const AuthProvider = ({ children }) => {
   // Update user balance
   const updateUserBalance = (newBalance) => {
     if (user) {
-      const updatedUser = { ...user, balance: newBalance };
+      const updatedUser = { ...user, balance: parseFloat(newBalance) || 0 };
       setUser(updatedUser);
     }
   };

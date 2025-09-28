@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { User, Settings, Key, DollarSign, History, ChevronRight, Edit, Save, X } from 'lucide-react';
+import { AuthContext } from '../AuthContext';
 
 const ProfileComponent = () => {
+  const { isAuthenticated, updateUserBalance } = useContext(AuthContext);
+  const navigate = useNavigate();
+
   const [profile, setProfile] = useState({ user: {}, settings: {}, betSummary: {} });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,13 +19,19 @@ const ProfileComponent = () => {
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [depositAmount, setDepositAmount] = useState('');
 
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
+
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
+      if (!isAuthenticated) return;
 
       const res = await axios.get('http://localhost:4000/api/profile', {
-        headers: { Authorization: `Bearer ${token}` }
+        withCredentials: true
       });
 
       setProfile(res.data);
@@ -49,12 +59,11 @@ const ProfileComponent = () => {
     setError('');
     setSuccess('');
     try {
-      const token = localStorage.getItem('token');
-      await axios.put('http://localhost:4000/api/profile', { email: formData.email }, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.put('http://localhost:4000/api/profile', { email: formData.email }, { withCredentials: true });
       await axios.put('http://localhost:4000/api/settings', {
         auto_cashout_multiplier: formData.auto_cashout_multiplier,
         auto_cashout_amount: formData.auto_cashout_amount
-      }, { headers: { Authorization: `Bearer ${token}` } });
+      }, { withCredentials: true });
 
       setSuccess('Profile updated successfully');
       setEditMode(false);
@@ -73,8 +82,7 @@ const ProfileComponent = () => {
       return;
     }
     try {
-      const token = localStorage.getItem('token');
-      await axios.put('http://localhost:4000/api/change-password', passwordData, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.put('http://localhost:4000/api/change-password', passwordData, { withCredentials: true });
       setSuccess('Password changed successfully');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPasswordChange(false);
@@ -92,11 +100,12 @@ const ProfileComponent = () => {
       return;
     }
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post('http://localhost:4000/api/deposit', { amount }, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await axios.post('http://localhost:4000/api/deposit', { amount }, { withCredentials: true });
       setSuccess(`Deposit of ${amount.toFixed(2)} successful`);
       setDepositAmount('');
-      setProfile(prev => ({ ...prev, user: { ...prev.user, balance: res.data.user.balance } }));
+      const newBalance = res.data.user.balance;
+      setProfile(prev => ({ ...prev, user: { ...prev.user, balance: newBalance } }));
+      updateUserBalance(newBalance);
     } catch (err) {
       setError(err.response?.data?.error || 'Deposit failed');
     }

@@ -17,12 +17,12 @@ import './style/ProfileComponent.css';
 
 // Authentication guard component
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
-  
-  if (!token) {
+  const { isAuthenticated } = useContext(AuthContext);
+
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
 };
 

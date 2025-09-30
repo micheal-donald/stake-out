@@ -6,9 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { ApiClient, useCurrentAdmin } from 'adminjs';
-
-const api = new ApiClient();
+import { useCurrentAdmin } from 'adminjs';
 
 const Dashboard = () => {
   const [currentAdmin] = useCurrentAdmin();
@@ -24,13 +22,27 @@ const Dashboard = () => {
     try {
       setLoading(true);
 
-      // Fetch dashboard overview data
-      const response = await api.getDashboard();
-      setDashboardData(response.data);
+      // Fetch dashboard overview data from the main API server
+      // Admin panel (port 5000) fetches data from API server (port 4000)
+      const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
+      const response = await fetch(`${API_URL}/api/admin/dashboard`, {
+        method: 'GET',
+        credentials: 'include', // Important: include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      setDashboardData(result.data);
 
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
-      setError('Failed to load dashboard data');
+      setError('Failed to load dashboard data. Please ensure the main API server is running on port 4000.');
     } finally {
       setLoading(false);
     }

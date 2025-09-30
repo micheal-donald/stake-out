@@ -19,6 +19,7 @@ const {
   gameLimiter,
   paymentLimiter,
   adminLimiter,
+  socketLimiter,
   enforceHTTPS
 } = require('./config/security');
 
@@ -101,6 +102,9 @@ app.get('/api/csrf-token', getCsrfToken);
 
 // Apply general API rate limiting to all API routes
 app.use('/api', apiLimiter);
+
+// Socket token endpoint gets its own rate limiter (before authLimiter)
+app.use('/api/socket-token', socketLimiter);
 
 // Routes with specific rate limiters
 app.use('/api', authLimiter, authRoutes); // Auth routes get strict limiting

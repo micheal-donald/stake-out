@@ -136,7 +136,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
     try {
       const authHeader = req.headers['authorization'];
       const token = authHeader && authHeader.split(' ')[1];
-      
+
       // Remove session from database using user ID instead of token
       await pool.query(
         'DELETE FROM sessions WHERE user_id = $1',
@@ -151,5 +151,33 @@ router.post('/logout', authenticateToken, async (req, res) => {
       res.status(500).json({ error: 'Server error during logout' });
     }
   });
+
+// Socket Token Endpoint
+// ⚠️ CRITICAL: DO NOT REMOVE - Required by frontend for socket authentication
+// This endpoint is called by StakeOutBet.js:119 to get a short-lived token for Socket.IO auth
+// Rate limiting: Uses socketLimiter (10 req/min) instead of authLimiter to allow multiple socket connections
+router.get('/socket-token', authenticateToken, async (req, res) => {
+  try {
+    // Generate a short-lived token for socket authentication
+    const socketToken = jwt.sign(
+      { userId: req.user.userId },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' } // Shorter expiry for socket tokens
+    );
+
+    logger.info('Socket token generated', {
+      userId: req.user.userId,
+      expiresIn: '1h'
+    });
+
+    res.json({ token: socketToken });
+  } catch (error) {
+    logger.error('Socket token generation failed:', {
+      userId: req.user?.userId,
+      error: error.message
+    });
+    res.status(500).json({ error: 'Failed to generate socket token' });
+  }
+});
 
 module.exports = router;

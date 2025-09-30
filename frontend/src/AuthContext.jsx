@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { clearSocketTokenCache } from './utils/socketTokenCache';
 
 // Create the auth context
 export const AuthContext = createContext();
@@ -69,6 +70,9 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear socket token cache on logout
+      clearSocketTokenCache();
+
       // Clear state (cookie cleared by server)
       setIsAuthenticated(false);
       setUser(null);

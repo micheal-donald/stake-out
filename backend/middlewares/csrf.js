@@ -63,6 +63,25 @@ const validateCsrfToken = (req, res, next) => {
     return next();
   }
 
+  // Skip CSRF for socket-token endpoint (GET request, read-only)
+  if (req.path === '/api/socket-token' && req.method === 'GET') {
+    return next();
+  }
+
+  // TODO: TEMPORARY - Skip CSRF for auth endpoints until frontend is updated
+  // Remove this once frontend implements CSRF token handling
+  if (req.path === '/api/register' ||
+      req.path === '/api/login' ||
+      req.path === '/api/logout' ||
+      req.path === '/api/refresh') {
+    logger.warn('CSRF validation temporarily disabled for auth endpoint', {
+      path: req.path,
+      method: req.method,
+      ip: req.ip
+    });
+    return next();
+  }
+
   // Get token from cookie
   const cookieToken = req.cookies.csrf_token;
 

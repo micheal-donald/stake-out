@@ -4,10 +4,17 @@ import { Clock, AlertTriangle, RefreshCw, InfoIcon } from 'lucide-react';
 import io from 'socket.io-client';
 import { AuthContext } from './AuthContext';
 
+// Import socket token cache utility
+import {
+  getCachedSocketToken,
+  setCachedSocketToken,
+  clearSocketTokenCache
+} from './utils/socketTokenCache';
+
 // Import helper functions - only for rendering, not for game logic
-import { 
-  generateLinePath, 
-  generateAreaPath, 
+import {
+  generateLinePath,
+  generateAreaPath,
   generateGridLines,
   DANGER_COLORS,
   getDynamicColor,
@@ -113,21 +120,57 @@ const StakeOutBet = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Get fresh socket token from backend
-    const getSocketToken = async () => {
+    // Get socket token with caching and rate limit protection
+    const getSocketToken = async (retryCount = 0) => {
       try {
+        // Check if we have a valid cached token first
+        const cachedToken = getCachedSocketToken(user?.user_id);
+        if (cachedToken) {
+          console.log('[SocketToken] Using cached token');
+          return cachedToken;
+        }
+
+        // If rate limited, implement exponential backoff
+        if (retryCount > 0) {
+          const delays = [0, 1000, 2000, 5000, 10000]; // milliseconds
+          const delay = delays[Math.min(retryCount, delays.length - 1)];
+          console.log(`[SocketToken] Retry ${retryCount}, waiting ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+        // Fetch new token from backend
+        console.log('[SocketToken] Fetching new token from API');
         const response = await fetch('http://localhost:4000/api/socket-token', {
           credentials: 'include' // Include httpOnly cookies
         });
 
         if (!response.ok) {
-          throw new Error('Failed to get socket token');
+          // Check if we hit rate limit
+          if (response.status === 429) {
+            console.warn('[SocketToken] Rate limit exceeded');
+            const retryAfter = response.headers.get('Retry-After') || 60;
+            throw new Error(`Rate limited. Retry after ${retryAfter} seconds.`);
+          }
+          throw new Error(`Failed to get socket token: ${response.status}`);
         }
 
         const data = await response.json();
-        return data.token;
+        const token = data.token;
+
+        // Cache the token for future use
+        if (token && user?.user_id) {
+          setCachedSocketToken(token, user.user_id);
+        }
+
+        return token;
       } catch (error) {
-        console.error('Error getting socket token:', error);
+        console.error('[SocketToken] Error:', error.message);
+
+        // Retry with exponential backoff on rate limit errors
+        if (error.message.includes('Rate limited') && retryCount < 3) {
+          return getSocketToken(retryCount + 1);
+        }
+
         return null;
       }
     };

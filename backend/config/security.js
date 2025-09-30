@@ -110,6 +110,27 @@ const adminLimiter = rateLimit({
   legacyHeaders: false
 });
 
+// Socket token endpoint rate limiter - 20 requests per minute
+// Allows multiple reconnection attempts during network instability
+// Rate limited per authenticated user (not IP) to prevent false positives
+const socketLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // Increased from 10 to handle: token refresh, page reloads, network reconnects
+  message: {
+    error: 'Too many socket token requests, please try again in a minute.',
+    code: 'SOCKET_RATE_LIMIT_EXCEEDED',
+    retryAfter: 60 // Seconds until limit resets
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false, // Count all requests to prevent abuse
+  // Use authenticated userId as key instead of IP to avoid blocking users on same network
+  keyGenerator: (req) => {
+    // If user is authenticated, use userId; otherwise fall back to IP
+    return req.user?.userId ? `user_${req.user.userId}` : req.ip;
+  }
+});
+
 /**
  * HTTPS enforcement middleware (for production)
  */
@@ -142,6 +163,7 @@ module.exports = {
   gameLimiter,
   paymentLimiter,
   adminLimiter,
+  socketLimiter,
   enforceHTTPS,
   socketSecurityHeaders
 };

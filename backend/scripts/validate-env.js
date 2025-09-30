@@ -106,7 +106,7 @@ if (process.env.NODE_ENV === 'production') {
   console.log('\n🔧 Production-specific validations...\n');
   
   // In production, we should have SSL enabled
-  if (!process.env.DATABASE_URL.includes('ssl=true')) {
+  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('ssl=true')) {
     console.warn('⚠️  Warning: DATABASE_URL should include ssl=true in production');
   }
   
@@ -123,8 +123,8 @@ if (process.env.NODE_ENV === 'production') {
 console.log('\n' + '='.repeat(50));
 if (allValid) {
   console.log('✅ All environment variables are valid!');
-  process.exit(0);
 } else {
   console.error('❌ Some environment variables are invalid or missing!');
+  console.error('Please check your .env file and ensure all required variables are set correctly.');
   process.exit(1);
 }

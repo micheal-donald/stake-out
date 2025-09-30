@@ -7,44 +7,41 @@
 
 import AdminJS from 'adminjs';
 import AdminJSExpress from '@adminjs/express';
-import * as AdminJSSQL from '@adminjs/sql';
 import session from 'express-session';
 import express from 'express';
 import bcrypt from 'bcrypt';
 import pg from 'pg';
 import dotenv from 'dotenv';
 
-// Load environment variables
+// Added: Load environment variables
 dotenv.config();
 
-const { Pool } = pg;
+// Added: Import sequelize and adminjs-sequelize
+import AdminJSSequelize from '@adminjs/sequelize';
+import User from './models/User.js';
 
-// Database connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://stakeout_user:securepassword@localhost:5432/stakeoutbet',
-});
-
-// Register SQL adapter
-AdminJS.registerAdapter({
-  Resource: AdminJSSQL.Resource,
-  Database: AdminJSSQL.Database,
-});
+// Added: Register sequelize adapter
+AdminJS.registerAdapter(AdminJSSequelize);
 
 /**
  * Custom authentication function
  */
 const authenticate = async (email, password) => {
   try {
-    const result = await pool.query(
+    // Use sequelize to query users table
+    const [result] = await User.sequelize.query(
       'SELECT user_id, username, email, password_hash, role FROM users WHERE email = $1 AND role IN ($2, $3, $4)',
-      [email, 'moderator', 'admin', 'super_admin']
+      {
+        bind: [email, 'moderator', 'admin', 'super_admin'],
+        type: User.sequelize.QueryTypes.SELECT
+      }
     );
 
-    if (result.rows.length === 0) {
+    if (!result || result.length === 0) {
       return null;
     }
 
-    const user = result.rows[0];
+    const user = result;
     const isValid = await bcrypt.compare(password, user.password_hash);
 
     if (!isValid) {
@@ -52,9 +49,11 @@ const authenticate = async (email, password) => {
     }
 
     // Log admin login
-    await pool.query(
+    await User.sequelize.query(
       'SELECT log_admin_action($1, $2, $3, $4, $5, $6, $7)',
-      [user.user_id, 'ADMIN_PANEL_LOGIN', 'admin_panel', null, JSON.stringify({ login_method: 'adminjs_form' }), null, null]
+      {
+        bind: [user.user_id, 'ADMIN_PANEL_LOGIN', 'admin_panel', null, JSON.stringify({ login_method: 'adminjs_form' }), null, null]
+      }
     );
 
     return {
@@ -78,17 +77,8 @@ const adminJs = new AdminJS({
   logoutPath: '/admin/logout',
   databases: [],
   resources: [
-    {
-      resource: { table: 'users', connectionOptions: pool },
-      options: {
-        id: 'users',
-        navigation: { name: 'Management', icon: 'Users' },
-        properties: {
-          password_hash: { isVisible: false },
-          balance: { type: 'currency' }
-        }
-      }
-    }
+    // Updated: Using proper User model
+    User
   ],
   branding: {
     companyName: 'Battle Arena',
@@ -102,17 +92,6 @@ const adminJs = new AdminJS({
  */
 const app = express();
 
-// Session configuration
-const sessionStore = session({
-  secret: process.env.JWT_SECRET || 'admin-session-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 30 * 60 * 1000 // 30 minutes
-  }
-});
-
 // Build authenticated router
 const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
   adminJs,
@@ -123,7 +102,6 @@ const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
   },
   null,
   {
-    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     secret: process.env.JWT_SECRET || 'admin-session-secret',

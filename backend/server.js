@@ -8,6 +8,9 @@ require('dotenv').config();
 // Import logger
 const logger = require('./config/logger');
 
+// Import and initialize Sentry (must be first)
+const sentry = require('./config/sentry');
+
 // Import security configurations
 const {
   helmetConfig,
@@ -46,6 +49,14 @@ const webhooksRoutes = require('./routes/webhooks');
 
 // Initialize Express app
 const app = express();
+
+// Initialize Sentry (must be before any other middleware)
+sentry.initSentry(app);
+
+// Sentry request handler (must be first middleware)
+app.use(sentry.requestHandler());
+app.use(sentry.tracingHandler());
+
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
@@ -55,7 +66,7 @@ const io = socketIo(server, {
   }
 });
 
-// Security Middleware (must be early in the chain)
+// Security Middleware (after Sentry, before routes)
 app.use(helmetConfig);
 app.use(enforceHTTPS);
 
@@ -113,9 +124,19 @@ const gameServer = new GameServer(io);
 // Setup WebSocket handlers
 setupSocketHandlers(io, gameServer);
 
+// Sentry error handler (before custom error handler)
+app.use(sentry.errorHandler());
+
 // Error handling middleware (must be last)
 app.use((err, req, res, next) => {
   logger.logError(err, req);
+
+  // Capture error in Sentry
+  sentry.captureException(err, {
+    user: req.user,
+    method: req.method,
+    url: req.originalUrl
+  });
 
   // Don't expose stack trace in production
   const errorResponse = {
@@ -163,6 +184,9 @@ const gracefulShutdown = async (signal) => {
   io.close(() => {
     logger.info('Socket.IO connections closed');
   });
+
+  // Close Sentry client
+  await sentry.close().catch(err => logger.error('Error closing Sentry:', err));
 
   // Give active requests 10 seconds to complete
   setTimeout(() => {

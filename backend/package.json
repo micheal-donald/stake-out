@@ -21,6 +21,8 @@
   "dependencies": {
     "@adminjs/express": "^6.1.0",
     "@adminjs/sql": "^2.2.6",
+    "@sentry/integrations": "^7.114.0",
+    "@sentry/node": "^10.16.0",
     "adminjs": "^7.8.13",
     "axios": "^1.8.4",
     "bcrypt": "^5.1.1",

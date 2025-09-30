@@ -1,53 +1,18 @@
 const { authenticateToken } = require('../middlewares/auth');
+const { registerValidation, loginValidation } = require('../middlewares/validation');
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const router = express.Router();
 
-// Simple rate limiting middleware for auth endpoints
-const rateLimit = (windowMs, max) => {
-  const requests = new Map();
-  
-  return (req, res, next) => {
-    const ip = req.ip || req.connection.remoteAddress;
-    const windowKey = `${ip}-${Math.floor(Date.now() / windowMs)}`;
-    const current = requests.get(windowKey) || 0;
-    
-    if (current >= max) {
-      return res.status(429).json({ error: 'Too many requests, please try again later' });
-    }
-    
-    requests.set(windowKey, current + 1);
-    
-    // Clean up old entries periodically
-    if (Math.random() < 0.1) { // 10% chance to clean up
-      const now = Date.now();
-      for (const [key] of requests.entries()) {
-        const keyTime = parseInt(key.split('-')[1]);
-        if (now - (keyTime * windowMs) > windowMs) {
-          requests.delete(key);
-        }
-      }
-    }
-    
-    next();
-  };
-};
-
-// Apply rate limiting to auth endpoints
-const loginLimiter = rateLimit(15 * 60 * 1000, 5); // 5 attempts per 15 minutes
-const registerLimiter = rateLimit(15 * 60 * 1000, 3); // 3 attempts per 15 minutes
+// NOTE: Rate limiting is now handled globally in server.js via authLimiter
+// This local implementation is kept for backward compatibility but is redundant
 
 // User Registration
-router.post('/register', registerLimiter, async (req, res) => {
+router.post('/register', registerValidation, async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    
-    // Validate input
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Username, email, and password are required' });
-    }
     
     // Check if username or email already exists
     const existingUser = await pool.query(
@@ -86,14 +51,9 @@ router.post('/register', registerLimiter, async (req, res) => {
 });
 
 // User Login
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginValidation, async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    // Validate input
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required' });
-    }
     
     // Find user
     const result = await pool.query(

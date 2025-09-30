@@ -8,8 +8,8 @@ async function authenticateSocketToken(token) {
     
     // Verify the user exists and has an active session
     const result = await pool.query(
-      'SELECT u.user_id, u.username, u.balance FROM users u JOIN sessions s ON u.user_id = s.user_id WHERE s.session_token = $1 AND s.expires_at > NOW()',
-      [token]
+      'SELECT u.user_id, u.username, u.balance FROM users u JOIN sessions s ON u.user_id = s.user_id WHERE u.user_id = $1 AND s.expires_at > NOW()',
+      [decoded.userId]
     );
     
     if (result.rows.length === 0) {

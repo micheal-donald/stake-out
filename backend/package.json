@@ -16,6 +16,9 @@
   "license": "ISC",
   "description": "API for Battle Arena game",
   "dependencies": {
+    "@adminjs/express": "^6.1.0",
+    "@adminjs/sql": "^2.2.6",
+    "adminjs": "^7.8.13",
     "axios": "^1.8.4",
     "bcrypt": "^5.1.1",
     "cookie-parser": "^1.4.7",
@@ -23,11 +26,17 @@
     "crypto": "^1.0.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-formidable": "^1.2.0",
+    "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.1",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "moment": "^2.30.1",
     "node-fetch": "^3.3.2",
     "pg": "^8.14.1",
-    "socket.io": "^4.8.1"
+    "socket.io": "^4.8.1",
+    "tslib": "^2.8.1"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",

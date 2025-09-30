@@ -3,8 +3,18 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
-const pool = require('./config/db');
 require('dotenv').config();
+
+// Import security configurations
+const {
+  helmetConfig,
+  apiLimiter,
+  authLimiter,
+  gameLimiter,
+  paymentLimiter,
+  adminLimiter,
+  enforceHTTPS
+} = require('./config/security');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -24,6 +34,10 @@ const GameServer = require('./game');
 const mpesaRoutes = require('./routes/mpesa');
 const webhooksRoutes = require('./routes/webhooks');
 
+// Import AdminJS components
+// TODO: Fix AdminJS imports (ESM compatibility issue)
+// const { createAdminJS, createAdminRouter } = require('./admin/adminConfig');
+
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
@@ -35,9 +49,13 @@ const io = socketIo(server, {
   }
 });
 
+// Security Middleware (must be early in the chain)
+app.use(helmetConfig);
+app.use(enforceHTTPS);
 
-// Middleware
-app.use(express.json());
+// Basic Middleware
+app.use(express.json({ limit: '10mb' })); // Add limit to prevent payload attacks
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
@@ -57,18 +75,24 @@ app.get('/', (req, res) => {
   });
 });
 
-// Routes
-app.use('/api', authRoutes);
+// Apply general API rate limiting to all API routes
+app.use('/api', apiLimiter);
+
+// Routes with specific rate limiters
+app.use('/api', authLimiter, authRoutes); // Auth routes get strict limiting
 app.use('/api/profile', profileRoutes);
 app.use('/api/settings', settingsRoutes);
-app.use('/api/bet', betsRoutes);
-app.use('/api/game', gameRoutes);
-// Use wallet routes
+app.use('/api/bet', gameLimiter, betsRoutes); // Game actions get specific limiting
+app.use('/api/game', gameLimiter, gameRoutes);
 app.use('/api/wallet', walletRoutes);
-// Add M-Pesa routes
-app.use('/api/mpesa', mpesaRoutes);
-// Add webhooks routes for payment module compatibility
-app.use('/api/webhooks', webhooksRoutes);
+app.use('/api/mpesa', paymentLimiter, mpesaRoutes); // Payment endpoints get strict limiting
+app.use('/api/webhooks', webhooksRoutes); // No rate limit on webhooks (external callbacks)
+
+// Initialize AdminJS with admin rate limiting
+// TODO: Fix AdminJS initialization (ESM compatibility issue)
+// const adminJs = createAdminJS();
+// const adminRouter = createAdminRouter(adminJs);
+// app.use(adminJs.options.rootPath, adminLimiter, adminRouter);
 
 // Initialize the game server
 const gameServer = new GameServer(io);
@@ -76,22 +100,75 @@ const gameServer = new GameServer(io);
 // Setup WebSocket handlers
 setupSocketHandlers(io, gameServer);
 
-// Periodic cleanup of expired sessions
-setInterval(async () => {
-  try {
-    const result = await pool.query(
-      'DELETE FROM sessions WHERE expires_at < NOW()'
-    );
-    if (result.rowCount > 0) {
-      console.log(`Cleaned up ${result.rowCount} expired sessions`);
-    }
-  } catch (error) {
-    console.error('Error cleaning up expired sessions:', error);
+// Error handling middleware (must be last)
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+
+  // Don't expose stack trace in production
+  const errorResponse = {
+    error: process.env.NODE_ENV === 'production'
+      ? 'An internal server error occurred'
+      : err.message,
+    code: err.code || 'INTERNAL_SERVER_ERROR'
+  };
+
+  if (process.env.NODE_ENV !== 'production') {
+    errorResponse.stack = err.stack;
   }
-}, 60 * 60 * 1000); // Run every hour
+
+  res.status(err.status || 500).json(errorResponse);
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not found',
+    code: 'NOT_FOUND',
+    path: req.path
+  });
+});
 
 // Start server
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
+const serverInstance = server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  // console.log(`AdminJS available at http://localhost:${PORT}${adminJs.options.rootPath}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Graceful shutdown handler
+const gracefulShutdown = async (signal) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+  // Stop accepting new connections
+  serverInstance.close(() => {
+    console.log('HTTP server closed');
+  });
+
+  // Close Socket.IO connections
+  io.close(() => {
+    console.log('Socket.IO connections closed');
+  });
+
+  // Give active requests 10 seconds to complete
+  setTimeout(() => {
+    console.error('Forcing shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+// Handle shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  gracefulShutdown('UNCAUGHT_EXCEPTION');
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  gracefulShutdown('UNHANDLED_REJECTION');
 });

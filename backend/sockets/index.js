@@ -1,10 +1,11 @@
 // backend/sockets/index.js - Updated version with better active bet handling
 const pool = require('../config/db');
+const logger = require('../config/logger');
 const { authenticateSocketToken } = require('../middlewares/socketAuth');
 
 module.exports = function setupSocketHandlers(io, gameServer) {
   io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
+    logger.info('New WebSocket connection', { socketId: socket.id });
     let authenticatedUser = null;
     
     // Send current game state immediately on connection
@@ -31,12 +32,12 @@ module.exports = function setupSocketHandlers(io, gameServer) {
         if (gameServer.hasActiveBet(user.userId)) {
           const activeBet = gameServer.getActiveBet(user.userId);
           socket.emit('active_bet', activeBet);
-          console.log(`User ${user.userId} has active bet:`, activeBet);
+          logger.info('User reconnected with active bet', { userId: user.userId, socketId: socket.id });
         }
-        
-        console.log(`User ${user.userId} authenticated on socket ${socket.id}`);
+
+        logger.logWithUser('info', 'Socket authenticated', user.userId, { socketId: socket.id });
       } catch (error) {
-        console.error('Socket authentication error:', error);
+        logger.logSecurity('SOCKET_AUTH_FAILED', null, { socketId: socket.id, error: error.message });
         socket.emit('authentication_error', 'Invalid token or session expired');
       }
     });
@@ -115,7 +116,7 @@ module.exports = function setupSocketHandlers(io, gameServer) {
         
         socket.emit('game_history', { games: result.rows });
       } catch (error) {
-        console.error('Error fetching game history:', error);
+        logger.error('Error fetching game history:', { error: error.message });
         socket.emit('error', 'Failed to fetch game history');
       }
     });
@@ -159,7 +160,7 @@ module.exports = function setupSocketHandlers(io, gameServer) {
           }
         });
       } catch (error) {
-        console.error('Error fetching bet history:', error);
+        logger.error('Error fetching bet history:', { userId: authenticatedUser.userId, error: error.message });
         socket.emit('error', 'Failed to fetch bet history');
       }
     });
@@ -202,7 +203,7 @@ module.exports = function setupSocketHandlers(io, gameServer) {
           verified: hashesMatch
         });
       } catch (error) {
-        console.error('Game verification error:', error);
+        logger.error('Game verification error:', { gameId, error: error.message });
         socket.emit('verification_result', { error: 'Server error verifying game' });
       }
     });
@@ -214,12 +215,19 @@ module.exports = function setupSocketHandlers(io, gameServer) {
     
     // Disconnect event
     socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
+      logger.info('WebSocket disconnected', {
+        socketId: socket.id,
+        userId: authenticatedUser?.userId
+      });
     });
-    
+
     // Error handling
     socket.on('error', (error) => {
-      console.error('Socket error:', error);
+      logger.error('Socket error:', {
+        socketId: socket.id,
+        userId: authenticatedUser?.userId,
+        error: error.message
+      });
     });
   });
 };

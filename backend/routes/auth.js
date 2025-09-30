@@ -1,5 +1,6 @@
 const { authenticateToken } = require('../middlewares/auth');
 const { registerValidation, loginValidation } = require('../middlewares/validation');
+const logger = require('../config/logger');
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -40,12 +41,18 @@ router.post('/register', registerValidation, async (req, res) => {
       [result.rows[0].user_id]
     );
     
+    logger.info('New user registered', {
+      userId: result.rows[0].user_id,
+      username: result.rows[0].username,
+      email: result.rows[0].email
+    });
+
     res.status(201).json({
       message: 'User registered successfully',
       user: result.rows[0]
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    logger.error('Registration error:', { username, email, error: error.message });
     res.status(500).json({ error: 'Server error during registration' });
   }
 });
@@ -102,6 +109,11 @@ router.post('/login', loginValidation, async (req, res) => {
       sameSite: 'strict'
     });
     
+    logger.logSecurity('USER_LOGIN', user.user_id, {
+      username: user.username,
+      ip: req.ip || req.connection.remoteAddress
+    });
+
     // Return user info (without token)
     res.json({
       message: 'Login successful',
@@ -114,7 +126,7 @@ router.post('/login', loginValidation, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', { username, error: error.message });
     res.status(500).json({ error: 'Server error during login' });
   }
 });
@@ -130,10 +142,12 @@ router.post('/logout', authenticateToken, async (req, res) => {
         'DELETE FROM sessions WHERE user_id = $1',
         [req.user.userId]
       );
-      
+
+      logger.logSecurity('USER_LOGOUT', req.user.userId);
+
       res.json({ message: 'Logout successful' });
     } catch (error) {
-      console.error('Logout error:', error);
+      logger.error('Logout error:', { userId: req.user?.userId, error: error.message });
       res.status(500).json({ error: 'Server error during logout' });
     }
   });

@@ -5,6 +5,9 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
 
+// Import logger
+const logger = require('./config/logger');
+
 // Import security configurations
 const {
   helmetConfig,
@@ -102,7 +105,7 @@ setupSocketHandlers(io, gameServer);
 
 // Error handling middleware (must be last)
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  logger.logError(err, req);
 
   // Don't expose stack trace in production
   const errorResponse = {
@@ -131,28 +134,29 @@ app.use((req, res) => {
 // Start server
 const PORT = process.env.PORT || 4000;
 const serverInstance = server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  // console.log(`AdminJS available at http://localhost:${PORT}${adminJs.options.rootPath}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Server running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info('Battle Arena API started successfully');
+  // logger.info(`AdminJS available at http://localhost:${PORT}${adminJs.options.rootPath}`);
 });
 
 // Graceful shutdown handler
 const gracefulShutdown = async (signal) => {
-  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  logger.warn(`${signal} received. Starting graceful shutdown...`);
 
   // Stop accepting new connections
   serverInstance.close(() => {
-    console.log('HTTP server closed');
+    logger.info('HTTP server closed');
   });
 
   // Close Socket.IO connections
   io.close(() => {
-    console.log('Socket.IO connections closed');
+    logger.info('Socket.IO connections closed');
   });
 
   // Give active requests 10 seconds to complete
   setTimeout(() => {
-    console.error('Forcing shutdown after timeout');
+    logger.error('Forcing shutdown after timeout');
     process.exit(1);
   }, 10000);
 };
@@ -163,12 +167,12 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
+  logger.error('Uncaught Exception:', { error: err.message, stack: err.stack });
   gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  logger.error('Unhandled Rejection:', { reason, promise: promise.toString() });
   gracefulShutdown('UNHANDLED_REJECTION');
 });

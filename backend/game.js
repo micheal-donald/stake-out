@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const pool = require('./config/db');
+const logger = require('./config/logger');
 const { MIN_BET, MAX_BET } = require('./config/constants');
 
 class GameServer {
@@ -38,11 +39,11 @@ class GameServer {
     try {
       // Generate the next game's crash point and hash
       await this.generateNextGame();
-      
+
       // Start the countdown
       this.startCountdown();
     } catch (error) {
-      console.error('Game initialization error:', error);
+      logger.error('Game initialization error:', { error: error.message, stack: error.stack });
       // Retry initialization after a short delay
       setTimeout(() => this.initGame(), 5000);
     }
@@ -86,10 +87,14 @@ class GameServer {
       );
       
       this.gameId = result.rows[0].game_id;
-      
-      console.log(`Created game ${this.gameId} with crash point ${this.crashPoint}x`);
+
+      logger.logGameEvent('GAME_CREATED', this.gameId, {
+        crashPoint: this.crashPoint,
+        hashSeed: seed.substring(0, 8) + '...',
+        hashResult: hash.substring(0, 8) + '...'
+      });
     } catch (error) {
-      console.error('Error generating game:', error);
+      logger.error('Error generating game:', { error: error.message, stack: error.stack });
       throw error;
     }
   }
@@ -133,11 +138,14 @@ class GameServer {
       
       // Start the game loop
       this.updateInterval = setInterval(() => this.updateGameState(), 50); // 20 updates per second
-      
-      console.log(`Game ${this.gameId} started. Will crash at ${this.crashPoint}x`);
-      console.log(`Active bets: ${this.activeBets.size}`);
+
+      logger.logGameEvent('GAME_STARTED', this.gameId, {
+        crashPoint: this.crashPoint,
+        activeBets: this.activeBets.size,
+        totalStaked: Array.from(this.activeBets.values()).reduce((sum, bet) => sum + bet.amount, 0)
+      });
     } catch (error) {
-      console.error('Error starting game:', error);
+      logger.error('Error starting game:', { gameId: this.gameId, error: error.message });
       this.handleGameError();
     }
   }
@@ -204,10 +212,13 @@ class GameServer {
       
       // Start a new round after a short delay
       setTimeout(() => this.initGame(), 3000);
-      
-      console.log(`Game ${this.gameId} crashed at ${this.crashPoint}x`);
+
+      logger.logGameEvent('GAME_CRASHED', this.gameId, {
+        crashPoint: this.crashPoint,
+        losers: this.activeBets.size
+      });
     } catch (error) {
-      console.error('Error processing crash:', error);
+      logger.error('Error processing crash:', { gameId: this.gameId, error: error.message });
       setTimeout(() => this.initGame(), 5000);
     }
   }
@@ -257,7 +268,7 @@ class GameServer {
         client.release();
       }
     } catch (error) {
-      console.error('Error completing game:', error);
+      logger.error('Error completing game:', { gameId: this.gameId, error: error.message });
       throw error;
     }
   }
@@ -304,7 +315,7 @@ class GameServer {
         client.release();
       }
     } catch (error) {
-      console.error('Error refunding bets:', error);
+      logger.error('Error refunding bets:', { gameId: this.gameId, error: error.message });
     }
   }
   
@@ -369,7 +380,7 @@ class GameServer {
     } catch (err) {
       // any unexpected error → rollback & report
       if (client) await client.query('ROLLBACK');
-      console.error('Error placing bet:', err);
+      logger.error('Error placing bet:', { userId, amount, error: err.message });
       return { success: false, error: 'Server error placing bet' };
     } finally {
       if (client) client.release();
@@ -419,7 +430,7 @@ class GameServer {
         return { success: false, error: result.error };
       }
     } catch (error) {
-      console.error('Error processing cashout:', error);
+      logger.error('Error processing cashout:', { userId, gameId: this.gameId, error: error.message });
       return { success: false, error: 'Server error processing cashout' };
     }
   }
@@ -468,7 +479,13 @@ class GameServer {
         client.release();
       }
     } catch (error) {
-      console.error('Database error during cashout:', error);
+      logger.error('Database error during cashout:', {
+        userId,
+        gameId: this.gameId,
+        betAmount,
+        atMultiplier,
+        error: error.message
+      });
       return { success: false, error: 'Server error processing cashout' };
     }
   }
@@ -502,7 +519,7 @@ class GameServer {
               });
             }
           })
-          .catch(error => console.error('Auto cashout error:', error));
+          .catch(error => logger.error('Auto cashout error (multiplier):', { userId, error: error.message }));
       }
       
       // Check amount-based auto cashout
@@ -533,16 +550,18 @@ class GameServer {
                 });
               }
             })
-            .catch(error => console.error('Auto cashout error:', error));
+            .catch(error => logger.error('Auto cashout error (amount):', { userId, error: error.message }));
         }
       }
     }
   }
-  
+
   lockBets() {
     // Once the game starts, no more bets can be placed
-    // This is just a timestamp to confirm when betting was closed
-    console.log(`Game ${this.gameId} - Betting locked at ${new Date().toISOString()}`);
+    logger.logGameEvent('BETTING_LOCKED', this.gameId, {
+      activeBets: this.activeBets.size,
+      timestamp: new Date().toISOString()
+    });
   }
   
   broadcastGameState() {

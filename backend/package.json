@@ -7,6 +7,7 @@
     "dev": "nodemon server.js",
     "admin": "node admin/server.mjs",
     "admin:dev": "nodemon admin/server.mjs",
+    "admin:fix-user": "node admin/fix-admin-user.js",
     "start:all": "concurrently \"npm run dev\" \"npm run admin:dev\"",
     "test": "jest",
     "test:unit": "jest --testPathPattern=tests/unit",

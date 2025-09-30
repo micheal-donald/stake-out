@@ -157,11 +157,7 @@ const AppContent = () => {
               <Navigate to="/" replace />
           } />
           
-          <Route path="/register" element={
-            !isAuthenticated ? 
-              <RegisterComponent /> : 
-              <Navigate to="/" replace />
-          } />
+          <Route path="/register" element={<RegisterComponent />} />
           
           <Route path="/profile" element={
             <PrivateRoute><ProfileComponent /></PrivateRoute>

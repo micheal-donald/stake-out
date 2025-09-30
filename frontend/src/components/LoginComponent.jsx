@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../AuthContext';
 
 const LoginComponent = () => {
@@ -80,7 +80,7 @@ const LoginComponent = () => {
         </button>
         
         <p className="mt-3">
-          Don't have an account? <a href="/register">Register</a>
+          Don't have an account? <Link to="/register">Register</Link>
         </p>
       </form>
     </div>

@@ -29,7 +29,7 @@ AdminJS.registerAdapter(AdminJSSequelize);
 const authenticate = async (email, password) => {
   try {
     // Use sequelize to query users table
-    const [result] = await User.sequelize.query(
+    const result = await User.sequelize.query(
       'SELECT user_id, username, email, password_hash, role FROM users WHERE email = $1 AND role IN ($2, $3, $4)',
       {
         bind: [email, 'moderator', 'admin', 'super_admin'],
@@ -41,20 +41,24 @@ const authenticate = async (email, password) => {
       return null;
     }
 
-    const user = result;
+    const user = result[0];
     const isValid = await bcrypt.compare(password, user.password_hash);
 
     if (!isValid) {
       return null;
     }
 
-    // Log admin login
-    await User.sequelize.query(
-      'SELECT log_admin_action($1, $2, $3, $4, $5, $6, $7)',
-      {
-        bind: [user.user_id, 'ADMIN_PANEL_LOGIN', 'admin_panel', null, JSON.stringify({ login_method: 'adminjs_form' }), null, null]
-      }
-    );
+    // Log admin login (with error handling for the log function)
+    try {
+      await User.sequelize.query(
+        'SELECT log_admin_action($1, $2, $3, $4, $5, $6, $7)',
+        {
+          bind: [user.user_id, 'ADMIN_PANEL_LOGIN', 'admin_panel', null, JSON.stringify({ login_method: 'adminjs_form' }), null, null]
+        }
+      );
+    } catch (logError) {
+      console.warn('Failed to log admin action, but login successful:', logError.message);
+    }
 
     return {
       id: user.user_id,

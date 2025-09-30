@@ -2,8 +2,22 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');
-require('dotenv').config();
+const helmet = require('helmet');
+const csrf = require('csurf');
+const rateLimit = require('express-rate-limit');
+const dotenv = require('dotenv');
+
+// Load environment variables
+dotenv.config();
+
+// Validate environment variables at startup
+// This addresses the "Environment Variable Security - P0" task in the MVP TODO list
+try {
+  require('./scripts/validate-env');
+} catch (error) {
+  console.error('Environment validation failed:', error.message);
+  process.exit(1);
+}
 
 // Import logger
 const logger = require('./config/logger');

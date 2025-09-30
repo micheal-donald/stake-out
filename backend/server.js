@@ -19,6 +19,9 @@ const {
   enforceHTTPS
 } = require('./config/security');
 
+// Import CSRF protection
+const { generateCsrfToken, validateCsrfToken, getCsrfToken } = require('./middlewares/csrf');
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
@@ -65,6 +68,10 @@ app.use(cors({
   credentials: true
 }));
 
+// CSRF Protection (after cookie parser, before routes)
+app.use(generateCsrfToken);
+app.use(validateCsrfToken);
+
 // Health check route for production monitoring
 const healthCheck = require('./server.health');
 app.get('/health', healthCheck);
@@ -77,6 +84,9 @@ app.get('/', (req, res) => {
     version: '1.0.0'
   });
 });
+
+// CSRF token endpoint for SPA
+app.get('/api/csrf-token', getCsrfToken);
 
 // Apply general API rate limiting to all API routes
 app.use('/api', apiLimiter);

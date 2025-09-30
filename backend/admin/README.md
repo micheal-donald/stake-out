@@ -55,17 +55,49 @@ A comprehensive admin panel for the Battle Arena application providing complete 
 ```
 
 ### 2. **Start the Application**
+
+#### Option A: Run Both Servers (Recommended)
+```bash
+cd backend
+npm run start:all  # Runs main API (port 4000) + admin panel (port 5000)
+```
+
+#### Option B: Run Admin Panel Only
+```bash
+cd backend
+npm run admin      # Production mode
+npm run admin:dev  # Development mode with auto-reload
+```
+
+#### Option C: Run Main API Only (Admin Disabled)
 ```bash
 cd backend
 npm run dev
 ```
 
 ### 3. **Access Admin Panel**
-- URL: `http://localhost:4000/admin`
+- URL: `http://localhost:5000/admin` (separate admin server)
 - Default Login: `admin@battlearena.local`
 - Default Password: `admin123`
 
 ⚠️ **IMPORTANT**: Change the default password immediately after first login!
+
+## ⚙️ Technical Architecture
+
+### ESM Compatibility
+AdminJS v7.8+ is **ESM-only**, which means it cannot be directly imported in CommonJS projects. To solve this:
+
+- **Main API Server**: `server.js` (CommonJS) - Port 4000
+- **Admin Panel Server**: `admin/server.mjs` (ESM) - Port 5000
+
+Both servers connect to the same PostgreSQL database and can run simultaneously.
+
+### Why Separate Servers?
+1. **ESM Compatibility**: AdminJS requires ESM modules
+2. **Independence**: Admin panel crashes don't affect main API
+3. **Security**: Admin panel can run on internal network only
+4. **Performance**: Separate resource allocation
+5. **Deployment Flexibility**: Can deploy admin panel separately
 
 ## 🔒 Security Configuration
 

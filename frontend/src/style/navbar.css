@@ -155,35 +155,58 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Hamburger Icon */
+/* Hamburger Icon - Enhanced Animation */
 .hamburger {
   display: flex;
   flex-direction: column;
-  width: 20px;
-  height: 16px;
+  justify-content: space-between;
+  width: 24px;
+  height: 18px;
   position: relative;
 }
 
 .hamburger span {
   display: block;
-  height: 2px;
+  height: 3px;
   width: 100%;
   background-color: var(--text-primary);
-  margin: 1px 0;
-  transition: all 0.3s ease;
+  border-radius: 2px;
+  transition: all 0.3s cubic-bezier(0.645, 0.045, 0.355, 1);
   transform-origin: center;
+  position: relative;
+}
+
+.hamburger span::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.hamburger:hover span::before {
+  opacity: 0.5;
+}
+
+/* Active State - X Icon */
+.hamburger.active span {
+  background-color: var(--primary-color);
 }
 
 .hamburger.active span:nth-child(1) {
-  transform: rotate(45deg) translate(4px, 4px);
+  transform: rotate(45deg) translateY(8px);
 }
 
 .hamburger.active span:nth-child(2) {
   opacity: 0;
+  transform: scaleX(0);
 }
 
 .hamburger.active span:nth-child(3) {
-  transform: rotate(-45deg) translate(5px, -5px);
+  transform: rotate(-45deg) translateY(-8px);
 }
 
 /* Mobile Responsive */
@@ -207,24 +230,28 @@
     top: 100%;
     left: 0;
     right: 0;
-    background-color: var(--bg-secondary);
-    border-top: 1px solid var(--border-color);
-    border-bottom: 1px solid var(--border-color);
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, rgba(26, 26, 46, 0.98) 100%);
+    backdrop-filter: blur(12px);
+    border-top: 2px solid var(--border-color);
+    border-bottom: 2px solid var(--border-color);
     padding: var(--space-md);
     flex-direction: column;
     gap: var(--space-sm);
-    transform: translateY(-100%);
+    max-height: 0;
     opacity: 0;
     visibility: hidden;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: translateY(-10px);
+    transition: all 0.4s cubic-bezier(0.645, 0.045, 0.355, 1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     z-index: 40;
+    overflow: hidden;
   }
-  
+
   .navbar-menu.mobile-open {
-    transform: translateY(0);
+    max-height: 500px; /* Allow for content height */
     opacity: 1;
     visibility: visible;
+    transform: translateY(0);
   }
   
   .navbar-menu a {

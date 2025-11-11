@@ -1,22 +1,49 @@
 // components/HistoryList.js
-import React from 'react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const HistoryList = ({ history }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
-    <div className="w-full">
-      <h2 className="text-xl font-bold mb-2">Previous Crashes</h2>
-      <div className="history-list flex flex-wrap gap-2">
-        {history.map(item => (
-          <div 
-            key={item.id} 
-            className={`history-item px-3 py-1 rounded font-mono
-                      ${item.crash < 2 ? 'bg-red-800' : ''}
-                      ${item.crash >= 2 && item.crash < 4 ? 'bg-yellow-800' : ''}
-                      ${item.crash >= 4 ? 'bg-green-800' : ''}`}
-          >
-            {item.crash.toFixed(2)}x
+    <div className="w-full history-container">
+      {/* Collapsible Header - Mobile Only */}
+      <button
+        className="history-header mobile-collapsible-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+        aria-expanded={isExpanded}
+        aria-controls="history-content"
+      >
+        <div className="history-header-content">
+          <span className="history-icon">📊</span>
+          <h2 className="history-title">Previous Crashes</h2>
+          <span className="history-count">{history.length}</span>
+        </div>
+        <span className="chevron-icon">
+          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        </span>
+      </button>
+
+      {/* History Content - Horizontal Scrolling on Mobile */}
+      <div
+        id="history-content"
+        className={`history-content ${isExpanded ? 'expanded' : 'collapsed'}`}
+      >
+        <div className="history-scroll-container">
+          <div className="history-list">
+            {history.map(item => (
+              <div
+                key={item.id}
+                className={`history-chip
+                          ${item.crash < 2 ? 'crash-low' : ''}
+                          ${item.crash >= 2 && item.crash < 4 ? 'crash-medium' : ''}
+                          ${item.crash >= 4 ? 'crash-high' : ''}`}
+              >
+                <span className="crash-value">{item.crash.toFixed(2)}x</span>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );

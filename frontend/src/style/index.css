@@ -3,36 +3,95 @@
 
 /* Neon Pulse Gaming Theme Design System */
 :root {
-  /* Neon Pulse Core Colors */
-  --primary-color: #00D1FF;        /* Vibrant cyan for primary actions */
-  --secondary-color: #FF2D75;      /* Hot pink for critical actions */
-  --danger-color: #FF3B30;         /* Danger/loss states */
-  --warning-color: #FFD700;        /* High multiplier highlights */
-  
-  /* Neon Pulse Backgrounds */
+  /* Neon Pulse Core Colors - Extended Palette */
+  --primary-50: #E0F7FF;
+  --primary-100: #B3EDFF;
+  --primary-200: #80E2FF;
+  --primary-300: #4DD6FF;
+  --primary-400: #26CEFF;
+  --primary-500: #00D1FF;        /* Main primary */
+  --primary-600: #00B8E6;
+  --primary-700: #0099CC;
+  --primary-800: #007AB3;
+  --primary-900: #005C99;
+
+  --secondary-50: #FFE5EF;
+  --secondary-100: #FFB3D1;
+  --secondary-200: #FF80B3;
+  --secondary-300: #FF4D95;
+  --secondary-400: #FF3A84;
+  --secondary-500: #FF2D75;      /* Main secondary */
+  --secondary-600: #E62969;
+  --secondary-700: #CC255D;
+  --secondary-800: #B32151;
+  --secondary-900: #991C45;
+
+  /* Semantic Colors with Shades */
+  --success-50: #E5FFF5;
+  --success-100: #B3FFDE;
+  --success-200: #80FFC7;
+  --success-300: #4DFFAF;
+  --success-400: #26FF9E;
+  --success-500: #00FF88;       /* Main success/green */
+  --success-600: #00E67A;
+  --success-700: #00CC6D;
+  --success-800: #00B35F;
+  --success-900: #009952;
+
+  --danger-50: #FFE5E5;
+  --danger-100: #FFB3B3;
+  --danger-200: #FF8080;
+  --danger-300: #FF4D4D;
+  --danger-400: #FF4338;
+  --danger-500: #FF3B30;         /* Main danger/red */
+  --danger-600: #E6352B;
+  --danger-700: #CC2F26;
+  --danger-800: #B32821;
+  --danger-900: #99221C;
+
+  --warning-50: #FFFBE5;
+  --warning-100: #FFF4B3;
+  --warning-200: #FFED80;
+  --warning-300: #FFE64D;
+  --warning-400: #FFDE26;
+  --warning-500: #FFD700;        /* Main warning/yellow */
+  --warning-600: #E6C200;
+  --warning-700: #CCAD00;
+  --warning-800: #B39900;
+  --warning-900: #998400;
+
+  /* Neon Pulse Backgrounds - Extended */
   --bg-primary: #0F0F1A;           /* Deep space black-blue */
   --bg-secondary: #1A1A2E;         /* Surface/container color */
   --bg-tertiary: #2A2A3E;          /* Elevated surfaces */
   --bg-hover: #3A3A4E;             /* Hover state */
-  
-  /* Neon Pulse Text Colors */
+  --bg-active: #4A4A5E;            /* Active state */
+
+  /* Neon Pulse Text Colors - Extended */
   --text-primary: #FFFFFF;         /* Primary text */
   --text-secondary: #A0A0B8;       /* Secondary text/labels */
   --text-muted: #6A6A7A;           /* Muted text */
-  
-  /* Neon Pulse Gaming Accent Colors */
-  --accent-green: #00FF88;         /* Success/win states */
-  --accent-red: #FF3B30;           /* Loss/crash states */
-  --accent-yellow: #FFD700;        /* Special highlights */
-  --accent-blue: #00D1FF;          /* Info/active states */
-  
+  --text-disabled: #4A4A5A;        /* Disabled text */
+
+  /* Quick Access Semantic Colors (backwards compatibility) */
+  --primary-color: var(--primary-500);
+  --secondary-color: var(--secondary-500);
+  --danger-color: var(--danger-500);
+  --warning-color: var(--warning-500);
+  --accent-green: var(--success-500);
+  --accent-red: var(--danger-500);
+  --accent-yellow: var(--warning-500);
+  --accent-blue: var(--primary-500);
+
   /* Neon Pulse Component Colors */
   --border-color: #00D1FF33;       /* Semi-transparent cyan borders */
+  --border-color-strong: #00D1FF66;
   --card-bg: #1A1A2E;             /* Card backgrounds */
   --input-bg: #2A2A3E;            /* Input backgrounds */
-  
-  /* Neon Glow Effects */
+
+  /* Neon Glow Effects - Enhanced */
   --glow-primary: 0 0 10px rgba(0, 209, 255, 0.5), 0 0 20px rgba(0, 209, 255, 0.3), 0 0 30px rgba(0, 209, 255, 0.2);
+  --glow-primary-strong: 0 0 15px rgba(0, 209, 255, 0.7), 0 0 30px rgba(0, 209, 255, 0.5), 0 0 45px rgba(0, 209, 255, 0.3);
   --glow-secondary: 0 0 10px rgba(255, 45, 117, 0.5), 0 0 20px rgba(255, 45, 117, 0.3);
   --glow-success: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.3);
   --glow-danger: 0 0 10px rgba(255, 59, 48, 0.5), 0 0 20px rgba(255, 59, 48, 0.3);
@@ -52,15 +111,27 @@
   --radius-lg: 0.75rem;           /* 12px */
   --radius-xl: 1rem;              /* 16px */
   
-  /* Typography */
-  --font-xs: 0.75rem;             /* 12px */
-  --font-sm: 0.875rem;            /* 14px */
-  --font-base: 1rem;              /* 16px */
-  --font-lg: 1.125rem;            /* 18px */
-  --font-xl: 1.25rem;             /* 20px */
-  --font-2xl: 1.5rem;             /* 24px */
-  --font-3xl: 1.875rem;           /* 30px */
-  --font-4xl: 2.25rem;            /* 36px */
+  /* Typography - Fluid Responsive Scaling */
+  --font-xs: clamp(0.7rem, 1.8vw, 0.75rem);           /* 11-12px */
+  --font-sm: clamp(0.8rem, 2vw, 0.875rem);            /* 13-14px */
+  --font-base: clamp(0.9rem, 2.2vw, 1rem);            /* 14-16px */
+  --font-lg: clamp(1rem, 2.5vw, 1.125rem);            /* 16-18px */
+  --font-xl: clamp(1.1rem, 2.8vw, 1.25rem);           /* 18-20px */
+  --font-2xl: clamp(1.3rem, 3.5vw, 1.5rem);           /* 21-24px */
+  --font-3xl: clamp(1.5rem, 4vw, 1.875rem);           /* 24-30px */
+  --font-4xl: clamp(1.8rem, 5vw, 2.25rem);            /* 29-36px */
+  --font-5xl: clamp(2.2rem, 6vw, 3rem);               /* 35-48px */
+
+  /* Line Heights for Better Readability */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* Letter Spacing */
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.025em;
+  --letter-spacing-wider: 0.05em;
   
   /* Legacy Support (for gradual migration) */
   --dark-color: var(--text-primary);
@@ -2410,4 +2481,346 @@ a:focus {
   .deployment-feed {
     max-height: 200px;
   }
+}
+
+/* ================================ */
+/* Enhanced Micro-Interactions      */
+/* ================================ */
+
+/* Button Press Effect */
+.btn-press {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn-press:active {
+  transform: scale(0.96);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Smooth Hover Lift */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* Subtle Scale on Hover */
+.hover-scale {
+  transition: transform 0.3s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.05);
+}
+
+/* Glow on Focus/Hover */
+.glow-on-hover {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.glow-on-hover:hover,
+.glow-on-hover:focus {
+  border-color: var(--primary-color);
+  box-shadow: var(--glow-primary);
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* Shake Animation (for errors) */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Bounce Animation (for success) */
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-12px); }
+  60% { transform: translateY(-6px); }
+}
+
+.bounce {
+  animation: bounce 1s ease;
+}
+
+/* Fade In Animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-in;
+}
+
+/* Slide In from Bottom */
+@keyframes slideInBottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in-bottom {
+  animation: slideInBottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Slide In from Top */
+@keyframes slideInTop {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in-top {
+  animation: slideInTop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Scale In */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Spin Animation (for loaders) */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Shimmer Effect (for loading states) */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-secondary) 0%,
+    var(--bg-tertiary) 50%,
+    var(--bg-secondary) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Ripple Effect (for clicks) */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect::after {
+  content: '';
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  background: rgba(0, 209, 255, 0.5);
+  border-radius: 50%;
+  transform: scale(0);
+  pointer-events: none;
+}
+
+.ripple-effect:active::after {
+  animation: ripple 0.6s ease-out;
+}
+
+/* Neon Pulse (already exists but enhanced) */
+@keyframes neon-pulse {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: var(--glow-primary);
+  }
+  50% {
+    opacity: 0.9;
+    text-shadow: var(--glow-primary-strong);
+  }
+}
+
+/* Danger Pulse */
+@keyframes danger-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: var(--glow-danger);
+  }
+  50% {
+    opacity: 0.85;
+    box-shadow: 0 0 15px rgba(255, 59, 48, 0.7), 0 0 30px rgba(255, 59, 48, 0.5);
+  }
+}
+
+/* Success Ripple */
+@keyframes success-ripple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 255, 136, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0);
+  }
+}
+
+.success-ripple {
+  animation: success-ripple 1s ease-out;
+}
+
+/* Crash Shake */
+@keyframes crash-shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-3px) rotate(-1deg); }
+  20%, 40%, 60%, 80% { transform: translateX(3px) rotate(1deg); }
+}
+
+.crash-shake {
+  animation: crash-shake 0.5s ease-in-out;
+}
+
+/* ================================ */
+/* Utility Classes                  */
+/* ================================ */
+
+/* Smooth Transitions */
+.transition-all {
+  transition: all 0.3s ease;
+}
+
+.transition-fast {
+  transition: all 0.15s ease;
+}
+
+.transition-slow {
+  transition: all 0.5s ease;
+}
+
+/* Transform GPU Acceleration */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Prevent Text Selection (for game UI) */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Focus Visible (for accessibility) */
+.focus-visible:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Hide Visually but Keep for Screen Readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Disabled State */
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Loading State */
+.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid rgba(0, 209, 255, 0.3);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
 }

@@ -4,7 +4,6 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
-const csrf = require('csurf');
 const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 

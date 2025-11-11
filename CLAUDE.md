@@ -131,3 +131,51 @@ Create `.env` files in backend/ with:
 - SQL injection prevention with parameterized queries
 - Balance operations use atomic database transactions
 - Game outcomes use cryptographically secure random generation
+
+---
+
+## 🚀 Release Readiness
+
+### Current Status: PRE-PRODUCTION
+**Target Launch:** 2 weeks (following sprint plan)
+
+### Critical Documentation
+- **[SPRINT_PLAN.md](./SPRINT_PLAN.md)** - Detailed 2-week launch plan with daily tasks
+- **[MVP_TODO_LIST.md](./MVP_TODO_LIST.md)** - Complete MVP checklist (all phases)
+- **[SECRETS_CHECKLIST.md](./SECRETS_CHECKLIST.md)** - Required environment variables
+- **[SECRETS_MANAGEMENT.md](./docs/SECRETS_MANAGEMENT.md)** - Secret handling procedures
+
+### Launch Blockers (P0 - Must Fix)
+1. **Security Vulnerabilities**: NPM packages with CRITICAL/HIGH vulnerabilities
+2. **Legal Compliance**: Missing age verification, Terms of Service, responsible gambling features
+3. **Payment Security**: Webhook signature verification disabled, incomplete idempotency
+4. **Authentication Gaps**: No email verification, password reset, or account lockout
+5. **Production Infrastructure**: No SSL/HTTPS configured, database SSL missing
+6. **Test Coverage**: 0% coverage - no tests exist
+
+### Quick Start for Sprint
+Follow the [2-Week Sprint Plan](./SPRINT_PLAN.md) which breaks down all tasks by day:
+- **Week 1**: Security hardening & compliance foundation
+- **Week 2**: Payment security & production deployment
+
+### Pre-Deployment Checklist
+Before deploying to production, ensure:
+- [ ] All P0 tasks from MVP_TODO_LIST.md completed
+- [ ] SPRINT_PLAN.md Week 1 & 2 tasks finished
+- [ ] Security audit clean (0 critical/high vulnerabilities)
+- [ ] Legal documents reviewed by lawyer
+- [ ] SSL/HTTPS configured with valid certificate
+- [ ] Monitoring active (Sentry, uptime checks)
+- [ ] Database backups configured
+- [ ] All secrets secured in vault (not in .env files)
+- [ ] Terms of Service acceptance implemented
+- [ ] Age verification (18+) enforced
+- [ ] Responsible gambling features live (deposit limits, self-exclusion)
+
+### Emergency Contacts
+- **M-Pesa Support**: support@safaricom.co.ke
+- **Hosting Provider**: [Add your provider contact]
+- **Legal Counsel**: [Add lawyer contact]
+- **On-Call Developer**: [Add emergency contact]
+
+---

@@ -75,7 +75,7 @@ const requiredUrls = [
 
 // Optional with defaults
 const optionalWithDefaults = [
-  { name: 'BCRYPT_ROUNDS', value: process.env.BCRYPT_ROUNDS || '12', min: 10, max: 20 }
+  { name: 'BCRYPT_ROUNDS', value: process.env.BCRYPT_ROUNDS || '12', min: 10, max: 14 }
 ];
 
 let allValid = true;

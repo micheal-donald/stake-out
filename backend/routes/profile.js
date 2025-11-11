@@ -79,8 +79,9 @@ router.put('/change-password', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
     
-    // Hash new password
-    const salt = await bcrypt.genSalt(10);
+    // Hash new password with configurable rounds from environment
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+    const salt = await bcrypt.genSalt(bcryptRounds);
     const password_hash = await bcrypt.hash(newPassword, salt);
     
     // Update password

@@ -25,8 +25,9 @@ router.post('/register', registerValidation, async (req, res) => {
       return res.status(409).json({ error: 'Username or email already exists' });
     }
     
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
+    // Hash password with configurable rounds from environment
+    const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+    const salt = await bcrypt.genSalt(bcryptRounds);
     const password_hash = await bcrypt.hash(password, salt);
     
     // Insert new user

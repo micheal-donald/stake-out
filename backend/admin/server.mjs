@@ -1,3 +1,129 @@
+import React from 'react';
+import { Box, Card, Title } from '@adminjs/design-system';
+
+const Dashboard = (props) => {
+  return (
+    <Box variant="container">
+      <Title>Dashboard</Title>
+      <Card>Welcome to Battle Arena Admin Panel.</Card>
+    </Box>
+  );
+};
+
+export default Dashboard;
+/**
+ * Centralized AdminJS Resource Configurations
+ * 
+ * Defines all database tables to be managed in the Admin panel.
+ */
+
+// Define common options for all resources
+const commonOptions = {
+  navigation: {
+    name: 'Management',
+    icon: 'Database'
+  }
+};
+
+export const adminResourceConfigurations = {
+  // Users table configuration
+  users: {
+    resource: { 
+      tableName: 'users', 
+      client: global.dbPool || null 
+    },
+    options: {
+      ...commonOptions,
+      label: 'Users',
+      properties: {
+        password_hash: {
+          isVisible: { list: false, filter: false, show: true, edit: false }
+        },
+        salt: {
+          isVisible: false
+        },
+        created_at: {
+          isVisible: { list: true, filter: true, show: true, edit: false }
+        },
+        updated_at: {
+          isVisible: { list: true, filter: true, show: true, edit: false }
+        }
+      }
+    }
+  },
+
+  // Game Rounds table configuration
+  game_rounds: {
+    resource: { 
+      tableName: 'game_rounds', 
+      client: global.dbPool || null 
+    },
+    options: {
+      ...commonOptions,
+      label: 'Game Rounds'
+    }
+  },
+
+  // Bet History table configuration
+  bet_history: {
+    resource: { 
+      tableName: 'bet_history', 
+      client: global.dbPool || null 
+    },
+    options: {
+      ...commonOptions,
+      label: 'Bet History'
+    }
+  },
+
+  // Transactions table configuration
+  transactions: {
+    resource: { 
+      tableName: 'transactions', 
+      client: global.dbPool || null 
+    },
+    options: {
+      ...commonOptions,
+      label: 'Transactions'
+    }
+  },
+
+  // Error Logs table configuration
+  error_logs: {
+    resource: { 
+      tableName: 'error_logs', 
+      client: global.dbPool || null 
+    },
+    options: {
+      ...commonOptions,
+      label: 'Error Logs'
+    }
+  },
+
+  // Admin Audit Log table configuration
+  admin_audit_log: {
+    resource: { 
+      tableName: 'admin_audit_log', 
+      client: global.dbPool || null 
+    },
+    options: {
+      ...commonOptions,
+      label: 'Admin Audit Log'
+    }
+  },
+
+  // System Settings table configuration
+  system_settings: {
+    resource: { 
+      tableName: 'system_settings', 
+      client: global.dbPool || null 
+    },
+    options: {
+      ...commonOptions,
+      label: 'System Settings'
+    }
+  }
+};
 /**
  * AdminJS Server (ESM Module)
  *

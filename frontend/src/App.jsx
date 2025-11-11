@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 
 // Import components
@@ -11,6 +11,9 @@ import StakeOutBet from './StakeOutBet';
 
 // Import auth context and provider
 import { AuthContext, AuthProvider } from './AuthContext';
+
+// Import API utilities
+import { initializeCsrf } from './utils/api';
 
 // Import CSS
 import './style/ProfileComponent.css';
@@ -184,6 +187,13 @@ const AppContent = () => {
 
 // Main app component
 const App = () => {
+  useEffect(() => {
+    // Initialize CSRF token when app loads
+    initializeCsrf().catch(error => {
+      console.error('Failed to initialize CSRF protection:', error);
+    });
+  }, []);
+
   return (
     <AuthProvider>
       <Router>

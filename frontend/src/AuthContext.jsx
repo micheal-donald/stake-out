@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient, { clearCsrfToken } from './utils/api';
 import { clearSocketTokenCache } from './utils/socketTokenCache';
 
 // Create the auth context
@@ -16,9 +16,7 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       try {
         // Check authentication status using httpOnly cookie
-        const res = await axios.get('http://localhost:4000/api/profile', {
-          withCredentials: true
-        });
+        const res = await apiClient.get('/api/profile');
         
         // Update user with latest data
         setUser(res.data.user);
@@ -39,11 +37,9 @@ export const AuthProvider = ({ children }) => {
   // Login function
   const login = async (username, password) => {
     try {
-      const res = await axios.post('http://localhost:4000/api/login', {
+      const res = await apiClient.post('/api/login', {
         username,
         password
-      }, {
-        withCredentials: true
       });
       
       // User data will be in the response
@@ -64,14 +60,15 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       // Notify the server about logout (clears the httpOnly cookie)
-      await axios.post('http://localhost:4000/api/logout', {}, {
-        withCredentials: true
-      });
+      await apiClient.post('/api/logout', {});
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
       // Clear socket token cache on logout
       clearSocketTokenCache();
+
+      // Clear CSRF token cache
+      clearCsrfToken();
 
       // Clear state (cookie cleared by server)
       setIsAuthenticated(false);

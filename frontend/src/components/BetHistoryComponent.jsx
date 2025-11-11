@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../AuthContext';
 
@@ -30,9 +30,7 @@ const BetHistoryComponent = () => {
       try {
         if (!isAuthenticated) return;
 
-        const res = await axios.get(`http://localhost:4000/api/bet/history?page=${pagination.currentPage}&limit=10`, {
-          withCredentials: true
-        });
+        const res = await apiClient.get(`/api/bet/history?page=${pagination.currentPage}&limit=10`);
         
         setBets(res.data.bets);
         setPagination(res.data.pagination);

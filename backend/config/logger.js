@@ -8,6 +8,7 @@
 const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
+const fs = require('fs');
 
 // Define log levels
 const levels = {
@@ -56,53 +57,55 @@ const consoleFormat = winston.format.combine(
 
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, '../logs');
-require('fs').mkdirSync(logsDir, { recursive: true });
-
-// Define transports
-const transports = [];
-
-// Console transport (always enabled)
-transports.push(
-  new winston.transports.Console({
-    format: consoleFormat,
-  })
-);
-
-// File transport for all logs (with rotation) - production only
-if (process.env.NODE_ENV === 'production') {
-  transports.push(
-    new DailyRotateFile({
-      filename: path.join(logsDir, 'application-%DATE%.log'),
-      datePattern: 'YYYY-MM-DD',
-      zippedArchive: true,
-      maxSize: '20m',
-      maxFiles: '14d',
-      format: format,
-    })
-  );
+try {
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Could not create logs directory:', err.message);
 }
 
-// File transport for errors only (with rotation)
-transports.push(
-  new DailyRotateFile({
-    filename: path.join(logsDir, 'error-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    zippedArchive: true,
-    maxSize: '20m',
-    maxFiles: '30d',
-    level: 'error',
-    format: format,
-  })
-);
+// Transports configuration
+const transports = [
+  // Console transport - always available
+  new winston.transports.Console({
+    format: consoleFormat,
+    level: level(),
+  }),
+];
 
-// Create the logger
+// Try to add file transports if possible
+try {
+  // Error file transport
+  transports.push(
+    new DailyRotateFile({
+      filename: path.join(logsDir, 'error-%DATE%.log'),
+      level: 'error',
+      maxFiles: '30d',
+      format,
+    })
+  );
+
+  // Only add application log in production if file system is available
+  if (process.env.NODE_ENV === 'production') {
+    transports.push(
+      new DailyRotateFile({
+        filename: path.join(logsDir, 'application-%DATE%.log'),
+        maxFiles: '14d',
+        format,
+      })
+    );
+  }
+} catch (err) {
+  console.warn('Could not set up file logging transports:', err.message);
+}
+
+// Create the logger instance
 const logger = winston.createLogger({
   level: level(),
   levels,
-  format,
   transports,
-  // Don't exit on handled exceptions
-  exitOnError: false,
+  exitOnError: false, // Don't exit on logging errors
 });
 
 // Create a stream for Morgan HTTP logging
@@ -112,50 +115,15 @@ logger.stream = {
   },
 };
 
-/**
- * Helper methods for contextual logging
- */
-
-// Log with user context
-logger.logWithUser = (level, message, userId, meta = {}) => {
-  logger.log(level, message, { userId, ...meta });
-};
-
-// Log request details
-logger.logRequest = (req, message, meta = {}) => {
-  logger.http(message, {
-    method: req.method,
-    url: req.originalUrl || req.url,
-    ip: req.ip || req.connection.remoteAddress,
-    userAgent: req.get('User-Agent'),
-    userId: req.user?.userId,
-    ...meta
-  });
-};
-
-// Log error with full context
-logger.logError = (error, req = null, meta = {}) => {
-  const errorData = {
+// Simplified error logging method that works reliably
+logger.logError = (error, request) => {
+  logger.error({
     message: error.message,
     stack: error.stack,
-    code: error.code,
-    ...meta
-  };
-
-  if (req) {
-    errorData.request = {
-      method: req.method,
-      url: req.originalUrl || req.url,
-      ip: req.ip || req.connection.remoteAddress,
-      userAgent: req.get('User-Agent'),
-      userId: req.user?.userId,
-      body: req.body,
-      params: req.params,
-      query: req.query
-    };
-  }
-
-  logger.error('Application Error', errorData);
+    url: request ? request.originalUrl : undefined,
+    method: request ? request.method : undefined,
+    user: request && request.user ? request.user.userId : undefined,
+  });
 };
 
 // Log game events

@@ -464,7 +464,7 @@ class PaymentServer {
       logger.info('Payment server initialization completed');
 
     } catch (error) {
-      logger.fatal('Failed to initialize payment server', {
+      logger.error('Failed to initialize payment server', {
         error: error.message,
         stack: error.stack
       });

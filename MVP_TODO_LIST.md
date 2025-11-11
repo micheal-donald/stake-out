@@ -73,30 +73,30 @@ cd frontend && npm audit --production
 **Owner:** Developer + DevOps
 
 #### Tasks:
-- [ ] **Generate Secure Secrets**
-  - [ ] Generate JWT_SECRET (32+ characters): `openssl rand -base64 32`
-  - [ ] Generate SESSION_SECRET (32+ characters): `openssl rand -base64 32`
-  - [ ] Generate PAYMENT_MODULE_API_KEY: `openssl rand -hex 32`
-  - [ ] Store secrets in secure vault (1Password, AWS Secrets Manager, etc.)
+- [x] **Generate Secure Secrets**
+  - [x] Generate JWT_SECRET (32+ characters): `openssl rand -base64 32`
+  - [x] Generate SESSION_SECRET (32+ characters): `openssl rand -base64 32`
+  - [x] Generate PAYMENT_MODULE_API_KEY: `openssl rand -hex 32`
+  - [x] Store secrets in secure vault (1Password, AWS Secrets Manager, etc.)
 
-- [ ] **Update .env Files**
-  - [ ] Create `backend/.env.production` with production values
-  - [ ] Verify `backend/.env` has secure development secrets
-  - [ ] Update `frontend/.env` with production API URLs
-  - [ ] Remove any placeholder/example secrets
+- [x] **Update .env Files**
+  - [x] Create `backend/.env.production` with production values
+  - [x] Verify `backend/.env` has secure development secrets
+  - [x] Update `frontend/.env` with production API URLs
+  - [x] Remove any placeholder/example secrets
 
-- [ ] **Validate Configuration**
-  - [ ] Add startup validation script: `backend/scripts/validate-env.js`
+- [x] **Validate Configuration**
+  - [x] Add startup validation script: `backend/scripts/validate-env.js`
     - Check JWT_SECRET length >= 32 characters
     - Check DATABASE_URL format
     - Check all required vars are set
     - Fail fast on missing/invalid config
-  - [ ] Add to server.js startup: require('./scripts/validate-env')
+  - [x] Add to server.js startup: require('./scripts/validate-env')
 
-- [ ] **Document Secrets**
-  - [ ] Create `SECRETS_CHECKLIST.md` with required env vars
-  - [ ] Document secret rotation procedures
-  - [ ] Add to deployment runbook
+- [x] **Document Secrets**
+  - [x] Create `SECRETS_CHECKLIST.md` with required env vars
+  - [x] Document secret rotation procedures
+  - [x] Add to deployment runbook
 
 **Acceptance Criteria:**
 - ✅ All production secrets are 32+ characters
@@ -105,8 +105,8 @@ cd frontend && npm audit --production
 - ✅ Secrets documented in secure location
 
 **Files to Create:**
-- `backend/scripts/validate-env.js`
-- `SECRETS_CHECKLIST.md`
+- [x] `backend/scripts/validate-env.js`
+- [x] `SECRETS_CHECKLIST.md`
 
 ---
 
@@ -629,30 +629,30 @@ cd frontend && npm audit --production
 **Owner:** DevOps
 
 #### Tasks:
-- [ ] **Production Environment File**
-  - [ ] Create `backend/.env.production.template`
-  - [ ] Document all required environment variables
-  - [ ] Remove all development/example values
-  - [ ] Add validation checklist
+- [x] **Production Environment File**
+  - [x] Create `backend/.env.production.template`
+  - [x] Document all required environment variables
+  - [x] Remove all development/example values
+  - [x] Add validation checklist
 
-- [ ] **Secrets Management**
-  - [ ] Choose secrets manager (AWS Secrets Manager, Vault, etc.)
-  - [ ] Migrate all secrets from .env to secrets manager
-  - [ ] Update deployment scripts to fetch secrets
-  - [ ] Document secret access procedures
+- [x] **Secrets Management**
+  - [x] Choose secrets manager (AWS Secrets Manager, Vault, etc.)
+  - [x] Migrate all secrets from .env to secrets manager
+  - [x] Update deployment scripts to fetch secrets
+  - [x] Document secret access procedures
 
-- [ ] **Configuration Validation**
-  - [ ] Enhance `backend/scripts/validate-env.js`
-  - [ ] Check NODE_ENV === 'production'
-  - [ ] Validate all URLs use https://
-  - [ ] Verify database URL uses SSL
-  - [ ] Check JWT_SECRET is production-grade
+- [x] **Configuration Validation**
+  - [x] Enhance `backend/scripts/validate-env.js`
+  - [x] Check NODE_ENV === 'production'
+  - [x] Validate all URLs use https://
+  - [x] Verify database URL uses SSL
+  - [x] Check JWT_SECRET is production-grade
 
-- [ ] **Frontend Environment**
-  - [ ] Create `frontend/.env.production`
-  - [ ] Set REACT_APP_API_URL to production backend
-  - [ ] Set REACT_APP_SOCKET_URL to production websocket
-  - [ ] Remove any debug flags
+- [x] **Frontend Environment**
+  - [x] Create `frontend/.env.production`
+  - [x] Set REACT_APP_API_URL to production backend
+  - [x] Set REACT_APP_SOCKET_URL to production websocket
+  - [x] Remove any debug flags
 
 **Acceptance Criteria:**
 - ✅ All production secrets in secrets manager
@@ -661,9 +661,9 @@ cd frontend && npm audit --production
 - ✅ Secrets rotation documented
 
 **Files to Create:**
-- `backend/.env.production.template`
-- `frontend/.env.production`
-- `docs/SECRETS_MANAGEMENT.md`
+- [x] `backend/.env.production.template`
+- [x] `frontend/.env.production`
+- [x] `docs/SECRETS_MANAGEMENT.md`
 
 ---
 

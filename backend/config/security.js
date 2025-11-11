@@ -128,6 +128,11 @@ const socketLimiter = rateLimit({
   keyGenerator: (req) => {
     // If user is authenticated, use userId; otherwise fall back to IP
     return req.user?.userId ? `user_${req.user.userId}` : req.ip;
+  },
+  // Skip rate limiting for authenticated users, only apply to unauthenticated requests
+  skip: (req, res) => {
+    // Skip rate limiting for authenticated users, only apply to unauthenticated requests
+    return !!req.user?.userId;
   }
 });
 

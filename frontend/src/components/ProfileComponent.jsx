@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/api';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, Settings, Key, DollarSign, History, ChevronRight, Edit, Save, X } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
@@ -30,9 +30,7 @@ const ProfileComponent = () => {
     try {
       if (!isAuthenticated) return;
 
-      const res = await axios.get('http://localhost:4000/api/profile', {
-        withCredentials: true
-      });
+      const res = await apiClient.get('/api/profile');
 
       setProfile(res.data);
       setFormData({
@@ -59,11 +57,11 @@ const ProfileComponent = () => {
     setError('');
     setSuccess('');
     try {
-      await axios.put('http://localhost:4000/api/profile', { email: formData.email }, { withCredentials: true });
-      await axios.put('http://localhost:4000/api/settings', {
+      await apiClient.put('/api/profile', { email: formData.email });
+      await apiClient.put('/api/settings', {
         auto_cashout_multiplier: formData.auto_cashout_multiplier,
         auto_cashout_amount: formData.auto_cashout_amount
-      }, { withCredentials: true });
+      });
 
       setSuccess('Profile updated successfully');
       setEditMode(false);
@@ -82,7 +80,7 @@ const ProfileComponent = () => {
       return;
     }
     try {
-      await axios.put('http://localhost:4000/api/change-password', passwordData, { withCredentials: true });
+      await apiClient.put('/api/change-password', passwordData);
       setSuccess('Password changed successfully');
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPasswordChange(false);
@@ -100,7 +98,7 @@ const ProfileComponent = () => {
       return;
     }
     try {
-      const res = await axios.post('http://localhost:4000/api/deposit', { amount }, { withCredentials: true });
+      const res = await apiClient.post('/api/deposit', { amount });
       setSuccess(`Deposit of ${amount.toFixed(2)} successful`);
       setDepositAmount('');
       const newBalance = res.data.user.balance;

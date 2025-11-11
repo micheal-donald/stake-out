@@ -1,105 +1,59 @@
 /**
- * Sentry Error Monitoring Configuration
- *
- * Centralizes error tracking and performance monitoring for production
+ * Sentry Configuration
+ * Error tracking and monitoring for the Battle Arena API
  */
 
 const Sentry = require('@sentry/node');
 const logger = require('./logger');
 
-/**
- * Initialize Sentry
- * Should be called as early as possible in the application
- */
-function initSentry(app) {
-  // Only initialize if DSN is provided and not in test environment
-  if (!process.env.SENTRY_DSN) {
-    logger.warn('Sentry DSN not configured. Error monitoring disabled.');
-    return false;
-  }
-
-  if (process.env.NODE_ENV === 'test') {
-    logger.info('Sentry disabled in test environment');
-    return false;
-  }
-
-  try {
-    Sentry.init({
-      dsn: process.env.SENTRY_DSN,
-      environment: process.env.NODE_ENV || 'development',
-      release: process.env.npm_package_version || '1.0.0',
-
-      // Performance monitoring
-      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0, // 10% in production, 100% in dev
-
-      // Integrations
-      integrations: [
-        // Express integration
+// Initialize Sentry only if DSN is provided
+const initSentry = (app) => {
+  if (process.env.SENTRY_DSN) {
+    try {
+      const integrations = [
+        // Enable HTTP calls tracing
         new Sentry.Integrations.Http({ tracing: true }),
+        // Enable Express.js middleware tracing
         new Sentry.Integrations.Express({ app }),
-        // Additional context
-        new Sentry.Integrations.OnUncaughtException({
-          onFatalError: (err) => {
-            logger.error('Fatal error caught by Sentry:', { error: err.message, stack: err.stack });
-            process.exit(1);
-          }
-        }),
-        new Sentry.Integrations.OnUnhandledRejection({ mode: 'warn' })
-      ],
+      ];
 
-      // Before send hook - sanitize sensitive data
-      beforeSend(event, hint) {
-        // Remove sensitive data
-        if (event.request) {
-          delete event.request.cookies;
-          if (event.request.headers) {
-            delete event.request.headers.authorization;
-            delete event.request.headers.cookie;
-          }
-        }
+      // Only add profiling integration if the package is available
+      try {
+        const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+        integrations.push(nodeProfilingIntegration());
+      } catch (err) {
+        logger.warn('Sentry profiling integration not available:', { error: err.message });
+      }
 
-        // Remove password fields from extra data
-        if (event.extra) {
-          ['password', 'password_hash', 'token', 'secret'].forEach(field => {
-            if (event.extra[field]) {
-              event.extra[field] = '[Filtered]';
-            }
-          });
-        }
+      Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        integrations,
+        // Performance Monitoring
+        tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+        // Set sampling rate for profiling - this is relative to tracesSampleRate
+        profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+        // Environment context
+        environment: process.env.NODE_ENV || 'development',
+      });
 
-        return event;
-      },
-
-      // Ignore certain errors
-      ignoreErrors: [
-        // Browser/network errors
-        'NetworkError',
-        'Network request failed',
-        // Expected errors
-        'CSRF_INVALID',
-        'CSRF_MISSING',
-        'RATE_LIMIT_EXCEEDED'
-      ]
-    });
-
-    logger.info('Sentry error monitoring initialized', {
-      environment: process.env.NODE_ENV,
-      release: process.env.npm_package_version
-    });
-
-    return true;
-  } catch (error) {
-    logger.error('Failed to initialize Sentry:', { error: error.message });
-    return false;
+      logger.info('Sentry initialized successfully');
+      return true;
+    } catch (error) {
+      logger.error('Failed to initialize Sentry:', { error: error.message });
+      return false;
+    }
   }
-}
+
+  logger.warn('Sentry DSN not provided, skipping initialization');
+  return false;
+};
 
 /**
  * Request handler middleware (must be first)
  */
 const requestHandler = () => {
   if (process.env.SENTRY_DSN) {
-    return Sentry.Handlers.requestHandler();
+    return Sentry.Handlers.requestHandler ? Sentry.Handlers.requestHandler() : (req, res, next) => next();
   }
   return (req, res, next) => next();
 };
@@ -109,119 +63,89 @@ const requestHandler = () => {
  */
 const tracingHandler = () => {
   if (process.env.SENTRY_DSN) {
-    return Sentry.Handlers.tracingHandler();
+    return Sentry.Handlers.tracingHandler ? Sentry.Handlers.tracingHandler() : (req, res, next) => next();
   }
   return (req, res, next) => next();
 };
 
 /**
- * Error handler middleware (must be after all controllers)
+ * Error handler middleware (before custom error handlers)
  */
 const errorHandler = () => {
   if (process.env.SENTRY_DSN) {
-    return Sentry.Handlers.errorHandler({
-      shouldHandleError(error) {
-        // Send all errors except 4xx client errors
-        if (error.status && error.status < 500) {
-          return false;
-        }
-        return true;
-      }
-    });
+    return Sentry.Handlers.errorHandler ? Sentry.Handlers.errorHandler() : (err, req, res, next) => next(err);
   }
   return (err, req, res, next) => next(err);
 };
 
 /**
- * Capture exception manually
+ * Capture exception and send to Sentry
  */
-function captureException(error, context = {}) {
-  if (!process.env.SENTRY_DSN) {
-    logger.error('Sentry not configured, error not captured:', {
-      error: error.message,
-      stack: error.stack,
-      context
-    });
-    return null;
+const captureException = (error, context = {}) => {
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureException(error, context);
   }
-
-  return Sentry.captureException(error, {
-    extra: context
-  });
-}
+};
 
 /**
- * Capture message manually
+ * Capture message and send to Sentry
  */
-function captureMessage(message, level = 'info', context = {}) {
-  if (!process.env.SENTRY_DSN) {
-    logger.log(level, message, context);
-    return null;
+const captureMessage = (message, level = 'info', context = {}) => {
+  if (process.env.SENTRY_DSN) {
+    Sentry.captureMessage(message, level, context);
   }
-
-  return Sentry.captureMessage(message, {
-    level,
-    extra: context
-  });
-}
+};
 
 /**
- * Set user context for error tracking
+ * Set user context in Sentry
  */
-function setUser(user) {
-  if (process.env.SENTRY_DSN && user) {
-    Sentry.setUser({
-      id: user.userId || user.user_id,
-      username: user.username,
-      email: user.email
-    });
+const setUser = (user) => {
+  if (process.env.SENTRY_DSN) {
+    Sentry.setUser(user);
   }
-}
+};
 
 /**
- * Clear user context
+ * Clear user context in Sentry
  */
-function clearUser() {
+const clearUser = () => {
   if (process.env.SENTRY_DSN) {
     Sentry.setUser(null);
   }
-}
+};
 
 /**
- * Add breadcrumb for debugging
+ * Add breadcrumb for better error context
  */
-function addBreadcrumb(message, category, level = 'info', data = {}) {
+const addBreadcrumb = (breadcrumb) => {
   if (process.env.SENTRY_DSN) {
-    Sentry.addBreadcrumb({
-      message,
-      category,
-      level,
-      data
-    });
+    Sentry.addBreadcrumb(breadcrumb);
   }
-}
+};
 
 /**
- * Close Sentry client (for graceful shutdown)
+ * Close Sentry client gracefully
  */
-async function close(timeout = 2000) {
+const close = async (timeout = 2000) => {
   if (process.env.SENTRY_DSN) {
-    logger.info('Closing Sentry client...');
-    await Sentry.close(timeout);
-    logger.info('Sentry client closed');
+    try {
+      await Sentry.close(timeout);
+    } catch (error) {
+      logger.error('Error closing Sentry:', { error: error.message });
+    }
   }
-}
+};
 
 module.exports = {
   initSentry,
-  requestHandler,
-  tracingHandler,
-  errorHandler,
   captureException,
   captureMessage,
   setUser,
   clearUser,
   addBreadcrumb,
   close,
+  requestHandler,
+  tracingHandler,
+  errorHandler,
   Sentry // Export raw Sentry for advanced usage
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../AuthContext'; 
+import { AuthContext } from '../AuthContext';
+import apiClient from '../utils/api'; 
 import { 
   ArrowUpCircle, 
   ArrowDownCircle,
@@ -83,9 +83,7 @@ const WalletComponent = () => {
       if (user) {
         setBalance(parseFloat(user.balance) || 0);
       } else {
-        const res = await axios.get('http://localhost:4000/api/wallet/balance', {
-          withCredentials: true
-        });
+        const res = await apiClient.get('/api/wallet/balance');
         setBalance(parseFloat(res.data.balance) || 0);
       }
       setLoading(false);
@@ -104,9 +102,7 @@ const WalletComponent = () => {
   const fetchTransactions = async (page = 1) => {
     setTransactionsLoading(true);
     try {
-      const res = await axios.get(`http://localhost:4000/api/wallet/transactions?page=${page}&limit=10`, {
-        withCredentials: true
-      });
+      const res = await apiClient.get(`/api/wallet/transactions?page=${page}&limit=10`);
 
       setTransactions(res.data.transactions);
       setPagination(res.data.pagination);
@@ -121,9 +117,7 @@ const WalletComponent = () => {
   const fetchPendingTransactions = async () => {
     try {
       setPendingLoading(true);
-      const res = await axios.get('http://localhost:4000/api/mpesa/pending-transactions', {
-        withCredentials: true
-      });
+      const res = await apiClient.get('/api/mpesa/pending-transactions');
 
       setPendingTransactions(res.data.transactions || []);
       setPendingLoading(false);
@@ -153,9 +147,7 @@ const WalletComponent = () => {
   // Refresh just the balance
   const refreshBalance = async () => {
     try {
-      const res = await axios.get('http://localhost:4000/api/wallet/balance', {
-        withCredentials: true
-      });
+      const res = await apiClient.get('/api/wallet/balance');
       
       const newBalance = parseFloat(res.data.balance) || 0;
       setBalance(newBalance);
@@ -193,9 +185,8 @@ const WalletComponent = () => {
 
     setProcessingDeposit(true);
     try {
-      const res = await axios.post('http://localhost:4000/api/mpesa/stk-push',
-        { amount, phoneNumber: mpesaPhone },
-        { withCredentials: true }
+      const res = await apiClient.post('/api/mpesa/stk-push',
+        { amount, phoneNumber: mpesaPhone }
       );
 
       // Set success message with transaction ID
@@ -228,9 +219,7 @@ const WalletComponent = () => {
           : tx
       ));
       
-      const res = await axios.get(`http://localhost:4000/api/mpesa/transaction-status/${checkoutRequestId}`, {
-        withCredentials: true
-      });
+      const res = await apiClient.get(`/api/mpesa/transaction-status/${checkoutRequestId}`);
       
       // Update the transaction status in the list
       setPendingTransactions(prev => prev.map(tx => 
@@ -275,9 +264,7 @@ const WalletComponent = () => {
   // Cancel a transaction
   const cancelTransaction = async (transactionId) => {
     try {
-      await axios.post(`http://localhost:4000/api/mpesa/cancel-transaction/${transactionId}`, {}, {
-        withCredentials: true
-      });
+      await apiClient.post(`/api/mpesa/cancel-transaction/${transactionId}`, {});
       
       // Update the transaction in the list
       setPendingTransactions(prev => prev.map(tx => 
@@ -303,9 +290,7 @@ const WalletComponent = () => {
   const checkAllPendingTransactions = async () => {
     try {
       setCheckingAll(true);
-      await axios.post('http://localhost:4000/api/mpesa/check-pending', {}, {
-        withCredentials: true
-      });
+      await apiClient.post('/api/mpesa/check-pending', {});
       
       // Refresh data
       refreshBalance();
@@ -330,9 +315,8 @@ const WalletComponent = () => {
     }
 
     try {
-      const res = await axios.post('http://localhost:4000/api/wallet/deposit',
-        { amount },
-        { withCredentials: true }
+      const res = await apiClient.post('/api/wallet/deposit',
+        { amount }
       );
 
       const newBalance = parseFloat(res.data.user.balance);
@@ -359,9 +343,8 @@ const WalletComponent = () => {
     }
 
     try {
-      const res = await axios.post('http://localhost:4000/api/wallet/withdraw',
-        { amount },
-        { withCredentials: true }
+      const res = await apiClient.post('/api/wallet/withdraw',
+        { amount }
       );
 
       const newBalance = parseFloat(res.data.user.balance);

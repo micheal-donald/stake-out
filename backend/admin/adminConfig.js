@@ -6,12 +6,9 @@
  */
 
 const AdminJS = require('adminjs');
-const AdminJSExpress = require('@adminjs/express');
 const AdminJSSQL = require('@adminjs/sql');
-const session = require('express-session');
 const bcrypt = require('bcrypt');
 const pool = require('../config/db');
-const { logAdminAction } = require('../middlewares/adminAuth');
 
 // Register SQL adapter
 AdminJS.registerAdapter({
@@ -407,47 +404,8 @@ function createAdminJS() {
   return adminJs;
 }
 
-/**
- * Create AdminJS router with authentication
- */
-function createAdminRouter(adminJs) {
-  const sessionStore = session({
-    secret: process.env.JWT_SECRET || 'admin-session-secret',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 30 * 60 * 1000 // 30 minutes
-    }
-  });
-
-  const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
-    adminJs,
-    {
-      authenticate,
-      cookiePassword: process.env.JWT_SECRET || 'admin-cookie-secret',
-      cookieName: 'adminjs-session'
-    },
-    null,
-    {
-      store: sessionStore,
-      resave: false,
-      saveUninitialized: false,
-      secret: process.env.JWT_SECRET || 'admin-session-secret',
-      cookie: {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 30 * 60 * 1000 // 30 minutes
-      },
-      name: 'adminjs.sid'
-    }
-  );
-
-  return adminRouter;
-}
-
 module.exports = {
   createAdminJS,
-  createAdminRouter,
+  authenticate,
   adminResourceConfigurations
 };

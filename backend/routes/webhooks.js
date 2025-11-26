@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const PaymentAdapter = require('../services/paymentAdapter');
 const mpesaService = require('../services/mpesa');
+const { webhookSecurityMiddleware } = require('../middlewares/webhookSecurity');
 
 // Initialize payment adapter with configuration
 const paymentAdapter = new PaymentAdapter({
@@ -16,7 +17,8 @@ const paymentAdapter = new PaymentAdapter({
 });
 
 // M-Pesa callback endpoint - this will handle webhooks from M-Pesa
-router.post('/mpesa/callback', async (req, res) => {
+// Apply security middleware: IP whitelisting and request validation
+router.post('/mpesa/callback', webhookSecurityMiddleware, async (req, res) => {
   try {
     console.log('M-Pesa Callback received at:', new Date().toISOString());
     console.log('Callback Headers:', JSON.stringify(req.headers, null, 2));

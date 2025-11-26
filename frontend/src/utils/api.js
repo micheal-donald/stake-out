@@ -1,11 +1,13 @@
 /**
- * API Client with CSRF Token Support
+ * API Client with CSRF Token and Idempotency Support
  *
- * Centralized axios instance that automatically handles CSRF tokens
- * for all API requests.
+ * Centralized axios instance that automatically handles:
+ * - CSRF tokens for all API requests
+ * - Idempotency keys for payment requests
  */
 
 import axios from 'axios';
+import { generateIdempotencyKey } from './idempotency';
 
 // Get API URL from environment or use default
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
@@ -81,7 +83,25 @@ const getCsrfToken = async () => {
 };
 
 /**
- * Request interceptor to add CSRF token
+ * Payment endpoints that require idempotency keys
+ */
+const PAYMENT_ENDPOINTS = [
+  '/api/mpesa/stk-push',
+  '/api/wallet/deposit',
+  '/api/wallet/withdraw',
+  '/api/deposit',
+  '/api/withdraw'
+];
+
+/**
+ * Check if endpoint requires idempotency key
+ */
+function requiresIdempotencyKey(url) {
+  return PAYMENT_ENDPOINTS.some(endpoint => url.includes(endpoint));
+}
+
+/**
+ * Request interceptor to add CSRF token and Idempotency-Key
  */
 apiClient.interceptors.request.use(
   async (config) => {
@@ -89,6 +109,7 @@ apiClient.interceptors.request.use(
     const methodsRequiringCsrf = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
     if (methodsRequiringCsrf.includes(config.method?.toUpperCase())) {
+      // Add CSRF token
       try {
         const token = await getCsrfToken();
         config.headers['X-CSRF-Token'] = token;
@@ -96,6 +117,16 @@ apiClient.interceptors.request.use(
         console.error('Failed to add CSRF token to request:', error);
         // Continue with request even if CSRF token fetch fails
         // The server will reject it, but this allows for better error handling
+      }
+
+      // Add Idempotency-Key for payment requests
+      if (requiresIdempotencyKey(config.url)) {
+        // Check if idempotency key already provided (for retries)
+        if (!config.headers['Idempotency-Key']) {
+          const idempotencyKey = generateIdempotencyKey();
+          config.headers['Idempotency-Key'] = idempotencyKey;
+          console.log('Generated idempotency key for payment request:', idempotencyKey);
+        }
       }
     }
 

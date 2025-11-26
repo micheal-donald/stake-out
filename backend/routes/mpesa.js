@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middlewares/auth');
+const { idempotencyMiddleware } = require('../middlewares/idempotency');
 const PaymentAdapter = require('../services/paymentAdapter');
 const mpesaService = require('../services/mpesa');
 const pool = require('../config/db');
@@ -18,8 +19,8 @@ const paymentAdapter = new PaymentAdapter({
   }
 });
 
-// Initiate STK Push
-router.post('/stk-push', authenticateToken, async (req, res) => {
+// Initiate STK Push (with idempotency protection)
+router.post('/stk-push', authenticateToken, idempotencyMiddleware, async (req, res) => {
   try {
     const { phoneNumber, amount } = req.body;
     const userId = req.user.userId;

@@ -7,17 +7,36 @@ const router = express.Router();
 // Get User Profile
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
+    // Get user data
+    const userResult = await pool.query(
       'SELECT user_id, username, email, balance, account_status, created_at FROM users WHERE user_id = $1',
       [req.user.userId]
     );
 
-    if (result.rows.length === 0) {
+    if (userResult.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
+    // Get user settings
+    const settingsResult = await pool.query(
+      'SELECT auto_cashout_multiplier, auto_cashout_amount FROM user_settings WHERE user_id = $1',
+      [req.user.userId]
+    );
+
+    // Get bet summary
+    const betSummaryResult = await pool.query(
+      `SELECT
+        COUNT(*) as total_bets,
+        COALESCE(SUM(CASE WHEN cashed_out = true THEN payout ELSE 0 END), 0) as total_winnings
+       FROM bet_history
+       WHERE user_id = $1`,
+      [req.user.userId]
+    );
+
     res.json({
-      user: result.rows[0]
+      user: userResult.rows[0],
+      settings: settingsResult.rows[0] || { auto_cashout_multiplier: 0, auto_cashout_amount: 0 },
+      betSummary: betSummaryResult.rows[0] || { total_bets: 0, total_winnings: 0 }
     });
   } catch (error) {
     console.error('Profile fetch error:', error);

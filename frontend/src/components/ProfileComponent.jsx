@@ -32,11 +32,18 @@ const ProfileComponent = () => {
 
       const res = await apiClient.get('/api/profile');
 
-      setProfile(res.data);
+      // Ensure all required fields exist with defaults
+      const profileData = {
+        user: res.data.user || {},
+        settings: res.data.settings || { auto_cashout_multiplier: 0, auto_cashout_amount: 0 },
+        betSummary: res.data.betSummary || { total_bets: 0, total_winnings: 0 }
+      };
+
+      setProfile(profileData);
       setFormData({
-        email: res.data.user.email,
-        auto_cashout_multiplier: res.data.settings.auto_cashout_multiplier || 0,
-        auto_cashout_amount: res.data.settings.auto_cashout_amount || 0
+        email: profileData.user.email || '',
+        auto_cashout_multiplier: profileData.settings.auto_cashout_multiplier || 0,
+        auto_cashout_amount: profileData.settings.auto_cashout_amount || 0
       });
       setLoading(false);
     } catch (err) {
@@ -111,9 +118,9 @@ const ProfileComponent = () => {
 
   if (loading) return <div className="loading-container">Loading profile...</div>;
 
-  const { username, email, balance, created_at } = profile.user;
-  const { total_bets = 0, total_winnings = 0 } = profile.betSummary;
-  const { auto_cashout_multiplier, auto_cashout_amount } = profile.settings;
+  const { username, email, balance, created_at } = profile.user || {};
+  const { total_bets = 0, total_winnings = 0 } = profile.betSummary || {};
+  const { auto_cashout_multiplier = 0, auto_cashout_amount = 0 } = profile.settings || {};
 
   return (
     <div className="profile-container">

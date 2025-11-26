@@ -8,6 +8,15 @@ import ProfileComponent from './components/ProfileComponent';
 import BetHistoryComponent from './components/BetHistoryComponent';
 import WalletComponent from './components/WalletComponent';
 import StakeOutBet from './StakeOutBet';
+import EmailVerificationBanner from './components/EmailVerificationBanner';
+
+// Import pages
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import ResponsibleGamblingPage from './pages/ResponsibleGamblingPage';
 
 // Import auth context and provider
 import { AuthContext, AuthProvider } from './AuthContext';
@@ -145,27 +154,41 @@ const AppContent = () => {
   return (
     <div className="app">
       <Navbar isAuthenticated={isAuthenticated} logout={logout} user={user} />
-      
+
+      {/* Show email verification banner for authenticated users with unverified emails */}
+      {isAuthenticated && <EmailVerificationBanner />}
+
       <div className="container">
         <Routes>
           <Route path="/" element={
-            isAuthenticated ? 
-              <StakeOutBet /> : 
+            isAuthenticated ?
+              <StakeOutBet /> :
               <Navigate to="/login" replace />
           } />
-          
+
           <Route path="/login" element={
-            !isAuthenticated ? 
-              <LoginComponent /> : 
+            !isAuthenticated ?
+              <LoginComponent /> :
               <Navigate to="/" replace />
           } />
-          
+
           <Route path="/register" element={<RegisterComponent />} />
-          
+
+          {/* Auth pages */}
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+
+          {/* Legal pages */}
+          <Route path="/terms" element={<TermsOfServicePage />} />
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/responsible-gambling" element={<ResponsibleGamblingPage />} />
+
+          {/* Protected routes */}
           <Route path="/profile" element={
             <PrivateRoute><ProfileComponent /></PrivateRoute>
           } />
-          
+
           <Route path="/history" element={
             <PrivateRoute><BetHistoryComponent /></PrivateRoute>
           } />
@@ -173,13 +196,18 @@ const AppContent = () => {
           <Route path="/wallet" element={
             <PrivateRoute><WalletComponent /></PrivateRoute>
           } />
-          
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
-      
+
       <footer className="footer">
         <p>&copy; {new Date().getFullYear()} Akiba Software Holdings. All rights reserved.</p>
+        <div style={{ marginTop: '10px', fontSize: '12px' }}>
+          <Link to="/terms" style={{ color: '#00D1FF', marginRight: '15px', textDecoration: 'none' }}>Terms of Service</Link>
+          <Link to="/privacy" style={{ color: '#00D1FF', marginRight: '15px', textDecoration: 'none' }}>Privacy Policy</Link>
+          <Link to="/responsible-gambling" style={{ color: '#00D1FF', textDecoration: 'none' }}>Responsible Gambling</Link>
+        </div>
       </footer>
     </div>
   );

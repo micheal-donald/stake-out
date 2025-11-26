@@ -42,6 +42,35 @@ const registerValidation = [
     .withMessage('Password must be at least 8 characters')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
+  body('dateOfBirth')
+    .isISO8601()
+    .withMessage('Invalid date of birth format')
+    .custom((value) => {
+      const birthDate = new Date(value);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      let calculatedAge = age;
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        calculatedAge--;
+      }
+      if (calculatedAge < 18) {
+        throw new Error('You must be at least 18 years old to register');
+      }
+      if (birthDate > today) {
+        throw new Error('Date of birth cannot be in the future');
+      }
+      return true;
+    }),
+  body('acceptedTerms')
+    .isBoolean()
+    .withMessage('Terms acceptance must be a boolean')
+    .custom((value) => {
+      if (value !== true) {
+        throw new Error('You must accept the Terms of Service to register');
+      }
+      return true;
+    }),
   validate
 ];
 

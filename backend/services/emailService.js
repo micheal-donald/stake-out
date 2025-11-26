@@ -1,25 +1,67 @@
 /**
- * Email Service using SendGrid
+ * Email Service using Nodemailer (Gmail SMTP)
  * Handles all email communications for Battle Arena
  *
  * Required environment variables:
- * - SENDGRID_API_KEY: Your SendGrid API key
- * - FROM_EMAIL: Sender email address (must be verified in SendGrid)
+ * - SMTP_HOST: SMTP server host (smtp.gmail.com)
+ * - SMTP_PORT: SMTP port (587 for TLS, 465 for SSL)
+ * - SMTP_USER: Your Gmail address
+ * - SMTP_PASS: Your Gmail App Password (not regular password!)
+ * - FROM_EMAIL: Sender email address (same as SMTP_USER)
  * - FRONTEND_URL: Frontend URL for email links
+ *
+ * Gmail App Password Setup:
+ * 1. Enable 2-Factor Authentication on your Google Account
+ * 2. Go to: https://myaccount.google.com/apppasswords
+ * 3. Select app: Mail, Select device: Other (Custom name)
+ * 4. Generate password and use it as SMTP_PASS
  */
 
-const sgMail = require('@sendgrid/mail');
+const nodemailer = require('nodemailer');
 const logger = require('../config/logger');
 
-// Initialize SendGrid with API key
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-} else {
-  logger.warn('SENDGRID_API_KEY not set - email functionality will be disabled');
+const FROM_EMAIL = process.env.FROM_EMAIL || process.env.SMTP_USER || 'noreply@battlearena.com';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+// Create reusable transporter
+let transporter = null;
+
+function createTransporter() {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    logger.warn('SMTP credentials not configured - email functionality will be disabled');
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: parseInt(process.env.SMTP_PORT) === 465, // true for 465, false for other ports
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: {
+      // Don't fail on invalid certificates
+      rejectUnauthorized: false
+    }
+  });
 }
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@battlearena.com';
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+// Initialize transporter
+if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  transporter = createTransporter();
+
+  // Verify connection configuration
+  transporter.verify(function (error, success) {
+    if (error) {
+      logger.error('SMTP connection verification failed:', error);
+    } else {
+      logger.info('SMTP server is ready to send emails');
+    }
+  });
+} else {
+  logger.warn('SMTP not configured - emails will not be sent');
+}
 
 /**
  * Send email verification link to user
@@ -30,9 +72,9 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 async function sendVerificationEmail(email, token, username) {
   const verificationLink = `${FRONTEND_URL}/verify-email?token=${token}`;
 
-  const msg = {
+  const mailOptions = {
+    from: `"Battle Arena" <${FROM_EMAIL}>`,
     to: email,
-    from: FROM_EMAIL,
     subject: 'Verify Your Battle Arena Account',
     text: `Hello ${username},\n\nWelcome to Battle Arena! Please verify your email address by clicking the link below:\n\n${verificationLink}\n\nThis link will expire in 24 hours.\n\nIf you didn't create an account, please ignore this email.\n\nBest regards,\nBattle Arena Team`,
     html: `
@@ -74,18 +116,7 @@ async function sendVerificationEmail(email, token, username) {
     `,
   };
 
-  try {
-    await sgMail.send(msg);
-    logger.info(`Verification email sent to ${email}`);
-    return { success: true };
-  } catch (error) {
-    logger.error('Failed to send verification email:', {
-      email,
-      error: error.message,
-      code: error.code
-    });
-    throw new Error('Failed to send verification email');
-  }
+  return sendEmail(mailOptions);
 }
 
 /**
@@ -97,9 +128,9 @@ async function sendVerificationEmail(email, token, username) {
 async function sendPasswordResetEmail(email, token, username) {
   const resetLink = `${FRONTEND_URL}/reset-password/${token}`;
 
-  const msg = {
+  const mailOptions = {
+    from: `"Battle Arena" <${FROM_EMAIL}>`,
     to: email,
-    from: FROM_EMAIL,
     subject: 'Reset Your Battle Arena Password',
     text: `Hello ${username},\n\nYou requested to reset your password for Battle Arena. Click the link below to reset it:\n\n${resetLink}\n\nThis link will expire in 1 hour.\n\nIf you didn't request a password reset, please ignore this email and your password will remain unchanged.\n\nBest regards,\nBattle Arena Team`,
     html: `
@@ -144,18 +175,7 @@ async function sendPasswordResetEmail(email, token, username) {
     `,
   };
 
-  try {
-    await sgMail.send(msg);
-    logger.info(`Password reset email sent to ${email}`);
-    return { success: true };
-  } catch (error) {
-    logger.error('Failed to send password reset email:', {
-      email,
-      error: error.message,
-      code: error.code
-    });
-    throw new Error('Failed to send password reset email');
-  }
+  return sendEmail(mailOptions);
 }
 
 /**
@@ -164,9 +184,9 @@ async function sendPasswordResetEmail(email, token, username) {
  * @param {string} username - User's username
  */
 async function sendPasswordChangedNotification(email, username) {
-  const msg = {
+  const mailOptions = {
+    from: `"Battle Arena" <${FROM_EMAIL}>`,
     to: email,
-    from: FROM_EMAIL,
     subject: 'Your Battle Arena Password Was Changed',
     text: `Hello ${username},\n\nYour Battle Arena account password was recently changed.\n\nIf you made this change, you can ignore this email.\n\nIf you didn't change your password, please contact support immediately at support@battlearena.com.\n\nBest regards,\nBattle Arena Team`,
     html: `
@@ -212,19 +232,7 @@ async function sendPasswordChangedNotification(email, username) {
     `,
   };
 
-  try {
-    await sgMail.send(msg);
-    logger.info(`Password changed notification sent to ${email}`);
-    return { success: true };
-  } catch (error) {
-    logger.error('Failed to send password changed notification:', {
-      email,
-      error: error.message,
-      code: error.code
-    });
-    // Don't throw error for notifications - it's not critical
-    return { success: false, error: error.message };
-  }
+  return sendEmail(mailOptions);
 }
 
 /**
@@ -236,9 +244,9 @@ async function sendPasswordChangedNotification(email, username) {
 async function sendAccountLockedNotification(email, username, lockedUntil) {
   const unlockTime = new Date(lockedUntil).toLocaleString();
 
-  const msg = {
+  const mailOptions = {
+    from: `"Battle Arena" <${FROM_EMAIL}>`,
     to: email,
-    from: FROM_EMAIL,
     subject: 'Your Battle Arena Account Has Been Locked',
     text: `Hello ${username},\n\nYour Battle Arena account has been temporarily locked due to multiple failed login attempts.\n\nYour account will be automatically unlocked at: ${unlockTime}\n\nIf you forgot your password, you can reset it at ${FRONTEND_URL}/forgot-password\n\nIf you didn't attempt to log in, please contact support immediately.\n\nBest regards,\nBattle Arena Team`,
     html: `
@@ -283,16 +291,33 @@ async function sendAccountLockedNotification(email, username, lockedUntil) {
     `,
   };
 
+  return sendEmail(mailOptions);
+}
+
+/**
+ * Generic email sending function with error handling
+ * @param {Object} mailOptions - Nodemailer mail options
+ */
+async function sendEmail(mailOptions) {
   try {
-    await sgMail.send(msg);
-    logger.logSecurity('ACCOUNT_LOCKED_EMAIL_SENT', null, { email, username });
-    return { success: true };
-  } catch (error) {
-    logger.error('Failed to send account locked notification:', {
-      email,
-      error: error.message
+    if (!transporter) {
+      logger.warn(`Email sending disabled (no SMTP configured). Would have sent: ${mailOptions.subject} to ${mailOptions.to}`);
+      return { success: false, message: 'Email service not configured' };
+    }
+
+    const info = await transporter.sendMail(mailOptions);
+    logger.info(`Email sent successfully: ${mailOptions.subject} to ${mailOptions.to}`, {
+      messageId: info.messageId
     });
-    return { success: false, error: error.message };
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    logger.error('Error sending email:', {
+      subject: mailOptions.subject,
+      to: mailOptions.to,
+      error: error.message,
+      stack: error.stack
+    });
+    throw error;
   }
 }
 
@@ -300,5 +325,5 @@ module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendPasswordChangedNotification,
-  sendAccountLockedNotification
+  sendAccountLockedNotification,
 };

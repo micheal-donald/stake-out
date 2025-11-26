@@ -24,18 +24,27 @@ const LoginComponent = () => {
 
   const onSubmit = async e => {
     e.preventDefault();
-    
+
     // Reset messages
     setError('');
     setLoading(true);
-    
+
     try {
       const result = await authContext.login(username, password);
-      
+
       if (result.success) {
         navigate('/');
       } else {
-        setError(result.error);
+        // Handle different error scenarios
+        if (result.status === 403) {
+          // Account locked
+          setError(result.error || 'Your account has been temporarily locked due to multiple failed login attempts. Please try again later or reset your password.');
+        } else if (result.status === 401 && result.attemptsRemaining !== undefined) {
+          // Failed login with attempts remaining
+          setError(`${result.error || 'Invalid credentials'}. ${result.attemptsRemaining} attempt${result.attemptsRemaining !== 1 ? 's' : ''} remaining before account lockout.`);
+        } else {
+          setError(result.error || 'Login failed. Please check your credentials.');
+        }
       }
     } catch (err) {
       setError('Login failed. Please check your credentials.');
@@ -78,7 +87,20 @@ const LoginComponent = () => {
         <button type="submit" disabled={loading}>
           {loading ? 'Logging in...' : 'Login'}
         </button>
-        
+
+        <Link
+          to="/forgot-password"
+          style={{
+            display: 'block',
+            marginTop: '15px',
+            textAlign: 'center',
+            color: '#00D1FF',
+            textDecoration: 'none'
+          }}
+        >
+          Forgot Password?
+        </Link>
+
         <p className="mt-3">
           Don't have an account? <Link to="/register">Register</Link>
         </p>

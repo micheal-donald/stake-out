@@ -1,19 +1,23 @@
 import React, { useState, useContext } from 'react';
-import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
+import { User, Lock, Eye, EyeOff, AlertCircle, Rocket } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
+import './LoginComponent.css';
 
+/**
+ * Modernized Login Component
+ * High-energy, gamer-centric UI with personality
+ */
 const LoginComponent = () => {
   const [formData, setFormData] = useState({
     username: '',
     password: ''
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const navigate = useNavigate();
-  
-  // Access the context - make sure the path matches your file structure
   const authContext = useContext(AuthContext);
 
   const { username, password } = formData;
@@ -24,8 +28,6 @@ const LoginComponent = () => {
 
   const onSubmit = async e => {
     e.preventDefault();
-
-    // Reset messages
     setError('');
     setLoading(true);
 
@@ -35,76 +37,106 @@ const LoginComponent = () => {
       if (result.success) {
         navigate('/');
       } else {
-        // Handle different error scenarios
         if (result.status === 403) {
-          // Account locked
-          setError(result.error || 'Your account has been temporarily locked due to multiple failed login attempts. Please try again later or reset your password.');
+          setError(result.error || 'Account locked due to multiple failed attempts. Try again later.');
         } else if (result.status === 401 && result.attemptsRemaining !== undefined) {
-          // Failed login with attempts remaining
-          setError(`${result.error || 'Invalid credentials'}. ${result.attemptsRemaining} attempt${result.attemptsRemaining !== 1 ? 's' : ''} remaining before account lockout.`);
+          setError(`${result.error || 'Invalid credentials'}. ${result.attemptsRemaining} attempt${result.attemptsRemaining !== 1 ? 's' : ''} left.`);
         } else {
-          setError(result.error || 'Login failed. Please check your credentials.');
+          setError(result.error || 'Login failed. Check your coordinates.');
         }
       }
     } catch (err) {
-      setError('Login failed. Please check your credentials.');
+      setError('System failure. Please check your uplink.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="login-container">
-      <h2>Login to Your Account</h2>
-      
-      {error && <div className="alert alert-danger">{error}</div>}
-      
-      <form onSubmit={onSubmit}>
-        <div className="form-group">
-          <label htmlFor="username">Username</label>
-          <input
-            type="text"
-            id="username"
-            name="username"
-            value={username}
-            onChange={onChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            value={password}
-            onChange={onChange}
-            required
-          />
-        </div>
-        
-        <button type="submit" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
+    <div className="auth-page-wrapper">
+      {/* Dynamic Background Elements */}
+      <div className="auth-bg-shapes">
+        <div className="shape shape-1"></div>
+        <div className="shape shape-2"></div>
+      </div>
 
-        <Link
-          to="/forgot-password"
-          style={{
-            display: 'block',
-            marginTop: '15px',
-            textAlign: 'center',
-            color: '#00D1FF',
-            textDecoration: 'none'
-          }}
-        >
-          Forgot Password?
-        </Link>
+      <div className="login-card">
+        <div className="login-header">
+          <h2>THE ARENA AWAITS</h2>
+          <p>Sign in and prepare for deployment</p>
+        </div>
 
-        <p className="mt-3">
-          Don't have an account? <Link to="/register">Register</Link>
-        </p>
-      </form>
+        {error && (
+          <div className="login-alert">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form className="login-form" onSubmit={onSubmit}>
+          <div className="form-group">
+            <div className="input-wrapper">
+              <User className="input-icon" size={20} />
+              <input
+                type="text"
+                name="username"
+                placeholder="USERNAME"
+                value={username}
+                onChange={onChange}
+                required
+                autoComplete="username"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <div className="input-wrapper">
+              <Lock className="input-icon" size={20} />
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="PASSWORD"
+                value={password}
+                onChange={onChange}
+                required
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex="-1"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="login-submit-btn"
+            disabled={loading}
+          >
+            {loading ? (
+              'INITIATING...'
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <Rocket size={18} />
+                ENTER THE ARENA
+              </span>
+            )}
+          </button>
+        </form>
+
+        <div className="login-footer">
+          <Link to="/forgot-password" size="sm" className="forgot-password-link">
+            TRANSMLISSION LOST? (FORGOT PASSWORD)
+          </Link>
+          <p className="register-link">
+            NEW PILOT? <Link to="/register">JOIN THE SQUADRON</Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

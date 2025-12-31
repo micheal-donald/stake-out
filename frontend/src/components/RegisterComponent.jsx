@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import apiClient from '../utils/api';
 import { useNavigate, Link } from 'react-router-dom';
+import { User, Mail, Lock, Eye, EyeOff, Calendar, AlertCircle, CheckCircle, ShieldCheck } from 'lucide-react';
+import './RegisterComponent.css';
 
+/**
+ * Modernized Register Component
+ * High-energy, gamer-centric UI with personality
+ */
 const RegisterComponent = () => {
   const [formData, setFormData] = useState({
     username: '',
@@ -11,10 +17,12 @@ const RegisterComponent = () => {
     dateOfBirth: '',
     acceptedTerms: false
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const navigate = useNavigate();
 
   const { username, email, password, confirmPassword, dateOfBirth, acceptedTerms } = formData;
@@ -24,7 +32,6 @@ const RegisterComponent = () => {
     setFormData({ ...formData, [e.target.name]: value });
   };
 
-  // Calculate age from date of birth
   const calculateAge = (dob) => {
     if (!dob) return 0;
     const today = new Date();
@@ -39,12 +46,9 @@ const RegisterComponent = () => {
 
   const onSubmit = async e => {
     e.preventDefault();
-    
-    // Reset messages
     setError('');
     setSuccess('');
-    
-    // Validate
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -55,29 +59,26 @@ const RegisterComponent = () => {
       return;
     }
 
-    // Validate date of birth
     if (!dateOfBirth) {
       setError('Date of birth is required');
       return;
     }
 
-    // Validate age (18+)
     const age = calculateAge(dateOfBirth);
     if (age < 18) {
-      setError('You must be at least 18 years old to register');
+      setError('You must be at least 18 years old to join');
       return;
     }
 
-    // Validate terms acceptance
     if (!acceptedTerms) {
-      setError('You must accept the Terms of Service to register');
+      setError('You must accept the Terms of Service to join');
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
-      const res = await apiClient.post('/api/register', {
+      await apiClient.post('/api/register', {
         username,
         email,
         password,
@@ -85,7 +86,7 @@ const RegisterComponent = () => {
         acceptedTerms
       });
 
-      setSuccess('Registration successful! Please check your email to verify your account.');
+      setSuccess('Enlistment successful! Check your uplink (email) for verification.');
       setFormData({
         username: '',
         email: '',
@@ -94,117 +95,172 @@ const RegisterComponent = () => {
         dateOfBirth: '',
         acceptedTerms: false
       });
-      
-      // Redirect to login after 2 seconds
+
       setTimeout(() => {
         navigate('/login');
-      }, 2000);
-      
+      }, 3000);
+
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      setError(err.response?.data?.error || 'Enlistment failed. Check your coordinates.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="register-container">
-      <h2>Create an Account</h2>
-      
-      {error && <div className="alert alert-danger">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
-      
-      <form onSubmit={onSubmit}>
-        <div className="form-group">
-          <label htmlFor="username">Username</label>
-          <input
-            type="text"
-            id="username"
-            name="username"
-            value={username}
-            onChange={onChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="email">Email Address</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={email}
-            onChange={onChange}
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            value={password}
-            onChange={onChange}
-            minLength="8"
-            required
-          />
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="confirmPassword">Confirm Password</label>
-          <input
-            type="password"
-            id="confirmPassword"
-            name="confirmPassword"
-            value={confirmPassword}
-            onChange={onChange}
-            minLength="8"
-            required
-          />
+    <div className="auth-page-wrapper">
+      {/* Dynamic Background Elements */}
+      <div className="auth-bg-shapes">
+        <div className="shape shape-1"></div>
+        <div className="shape shape-2"></div>
+      </div>
+
+      <div className="register-card">
+        <div className="register-header">
+          <h2>JOIN THE SQUADRON</h2>
+          <p>Create your commander profile today</p>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="dateOfBirth">Date of Birth</label>
-          <input
-            type="date"
-            id="dateOfBirth"
-            name="dateOfBirth"
-            value={dateOfBirth}
-            onChange={onChange}
-            max={new Date().toISOString().split('T')[0]}
-            required
-          />
-          <small style={{display: 'block', marginTop: '5px', color: '#888'}}>
-            You must be 18 or older to register
-          </small>
-        </div>
+        {error && (
+          <div className="register-alert alert-error">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+        )}
 
-        <div className="form-group" style={{marginTop: '20px'}}>
-          <label style={{display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer'}}>
-            <input
-              type="checkbox"
-              name="acceptedTerms"
-              checked={acceptedTerms}
-              onChange={onChange}
-              required
-              style={{marginTop: '3px', width: 'auto', cursor: 'pointer'}}
-            />
-            <span>
-              I accept the <Link to="/terms" target="_blank" style={{color: '#00D1FF'}}>Terms of Service</Link> and <Link to="/privacy" target="_blank" style={{color: '#00D1FF'}}>Privacy Policy</Link>
-            </span>
-          </label>
-        </div>
+        {success && (
+          <div className="register-alert alert-success">
+            <CheckCircle size={18} />
+            <span>{success}</span>
+          </div>
+        )}
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Registering...' : 'Register'}
-        </button>
-        
-        <p className="mt-3">
-          Already have an account? <Link to="/login">Log in</Link>
-        </p>
-      </form>
+        <form className="register-form" onSubmit={onSubmit}>
+          <div className="form-group">
+            <label className="input-label">USERNAME</label>
+            <div className="input-wrapper">
+              <User className="input-icon" size={18} />
+              <input
+                type="text"
+                name="username"
+                placeholder="Unique identifier"
+                value={username}
+                onChange={onChange}
+                required
+                autoComplete="username"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="input-label">EMAIL ADDRESS</label>
+            <div className="input-wrapper">
+              <Mail className="input-icon" size={18} />
+              <input
+                type="email"
+                name="email"
+                placeholder="Uplink address"
+                value={email}
+                onChange={onChange}
+                required
+                autoComplete="email"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="input-label">PASSWORD</label>
+            <div className="input-wrapper">
+              <Lock className="input-icon" size={18} />
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                placeholder="Min 8 characters"
+                value={password}
+                onChange={onChange}
+                required
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex="-1"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="input-label">CONFIRM PASSWORD</label>
+            <div className="input-wrapper">
+              <ShieldCheck className="input-icon" size={18} />
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                placeholder="Repeat password"
+                value={confirmPassword}
+                onChange={onChange}
+                required
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                tabIndex="-1"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="input-label">DATE OF BIRTH</label>
+            <div className="input-wrapper">
+              <Calendar className="input-icon" size={18} />
+              <input
+                type="date"
+                name="dateOfBirth"
+                value={dateOfBirth}
+                onChange={onChange}
+                max={new Date().toISOString().split('T')[0]}
+                required
+              />
+            </div>
+          </div>
+
+          <div className="terms-wrapper">
+            <label className="terms-checkbox-label">
+              <input
+                type="checkbox"
+                name="acceptedTerms"
+                checked={acceptedTerms}
+                onChange={onChange}
+                required
+              />
+              <span>
+                I accept the <Link to="/terms" target="_blank">Terms of Service</Link> and <Link to="/privacy" target="_blank">Privacy Policy</Link>
+              </span>
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            className="register-submit-btn"
+            disabled={loading}
+          >
+            {loading ? 'INITIATING ENLISTMENT...' : 'ENLIST NOW'}
+          </button>
+        </form>
+
+        <div className="register-footer">
+          <p>
+            ALREADY DEPLOYED? <Link to="/login">LOG IN TO STATION</Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 };

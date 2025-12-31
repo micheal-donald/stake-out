@@ -159,48 +159,50 @@ const AppContent = () => {
       {/* Show email verification banner for authenticated users with unverified emails */}
       {isAuthenticated && <EmailVerificationBanner />}
 
-      <div className="container">
-        <Routes>
-          <Route path="/" element={
-            isAuthenticated ?
-              <StakeOutBet /> :
-              <LandingPage />
-          } />
+      <Routes>
+        <Route path="/" element={
+          isAuthenticated ?
+            <div className="container"><StakeOutBet /></div> :
+            <LandingPage />
+        } />
 
-          <Route path="/login" element={
-            !isAuthenticated ?
-              <LoginComponent /> :
-              <Navigate to="/" replace />
-          } />
+        <Route path="/login" element={
+          !isAuthenticated ?
+            <LoginComponent /> :
+            <Navigate to="/" replace />
+        } />
 
-          <Route path="/register" element={<RegisterComponent />} />
+        <Route path="/register" element={
+          !isAuthenticated ?
+            <RegisterComponent /> :
+            <Navigate to="/" replace />
+        } />
 
-          {/* Auth pages */}
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+        {/* Auth pages */}
+        <Route path="/verify-email" element={<div className="container"><VerifyEmailPage /></div>} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
-          {/* Legal pages */}
-          <Route path="/terms" element={<TermsOfServicePage />} />
-          <Route path="/privacy" element={<PrivacyPolicyPage />} />
-          <Route path="/responsible-gambling" element={<ResponsibleGamblingPage />} />
+        {/* Legal pages */}
+        <Route path="/terms" element={<div className="container"><TermsOfServicePage /></div>} />
+        <Route path="/privacy" element={<div className="container"><PrivacyPolicyPage /></div>} />
+        <Route path="/responsible-gambling" element={<div className="container"><ResponsibleGamblingPage /></div>} />
 
-          {/* Protected routes */}
-          <Route path="/profile" element={
-            <PrivateRoute><ProfileComponent /></PrivateRoute>
-          } />
+        {/* Protected routes */}
+        <Route path="/profile" element={
+          <PrivateRoute><div className="container"><ProfileComponent /></div></PrivateRoute>
+        } />
 
-          <Route path="/history" element={
-            <PrivateRoute><BetHistoryComponent /></PrivateRoute>
-          } />
+        <Route path="/history" element={
+          <PrivateRoute><div className="container"><BetHistoryComponent /></div></PrivateRoute>
+        } />
 
-          <Route path="/wallet" element={
-            <PrivateRoute><WalletComponent /></PrivateRoute>
-          } />
+        <Route path="/wallet" element={
+          <PrivateRoute><div className="container"><WalletComponent /></div></PrivateRoute>
+        } />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
 
       <footer className="footer">
         <p>&copy; {new Date().getFullYear()} Akiba Software Holdings. All rights reserved.</p>

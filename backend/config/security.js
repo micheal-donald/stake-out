@@ -61,17 +61,23 @@ const apiLimiter = rateLimit({
   }
 });
 
-// Strict limiter for authentication endpoints - 5 requests per 15 minutes
+// Strict limiter for authentication endpoints - 20 requests per 15 minutes
+// This allows for reasonable testing while still preventing brute force attacks
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: process.env.NODE_ENV === 'production' ? 10 : 20, // More lenient in development
   message: {
-    error: 'Too many login attempts, please try again later.',
-    code: 'AUTH_RATE_LIMIT_EXCEEDED'
+    error: 'Too many authentication attempts from this IP, please try again later.',
+    code: 'AUTH_RATE_LIMIT_EXCEEDED',
+    retryAfter: Math.ceil(15 * 60) // Seconds until limit resets
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: true // Don't count successful logins
+  skipSuccessfulRequests: true, // Don't count successful logins
+  // Skip rate limiting in development if you want to disable it completely
+  skip: (req) => {
+    return process.env.DISABLE_RATE_LIMIT === 'true' && process.env.NODE_ENV !== 'production';
+  }
 });
 
 // Game action rate limiter - 30 requests per minute

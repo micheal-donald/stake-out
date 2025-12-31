@@ -1,5 +1,6 @@
 const { authenticateToken } = require('../middlewares/auth');
 const { registerValidation, loginValidation } = require('../middlewares/validation');
+const { authLimiter } = require('../config/security');
 const logger = require('../config/logger');
 const express = require('express');
 const bcrypt = require('bcrypt');
@@ -35,7 +36,7 @@ function calculateAge(dateOfBirth) {
 /**
  * User Registration with Email Verification and Age Check
  */
-router.post('/register', registerValidation, async (req, res) => {
+router.post('/register', authLimiter, registerValidation, async (req, res) => {
   const client = await pool.connect();
 
   try {
@@ -272,7 +273,7 @@ router.post('/resend-verification', async (req, res) => {
 /**
  * User Login with Account Lockout Protection
  */
-router.post('/login', loginValidation, async (req, res) => {
+router.post('/login', authLimiter, loginValidation, async (req, res) => {
   const client = await pool.connect();
 
   try {

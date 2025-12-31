@@ -17,6 +17,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import TermsOfServicePage from './pages/TermsOfServicePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import ResponsibleGamblingPage from './pages/ResponsibleGamblingPage';
+import LandingPage from './pages/LandingPage';
 
 // Import auth context and provider
 import { AuthContext, AuthProvider } from './AuthContext';
@@ -59,7 +60,7 @@ const Navbar = ({ isAuthenticated, logout, user }) => {
           <span className="brand-subtitle"></span>
         </Link>
       </div>
-      
+
       {/* Hamburger menu button */}
       <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
         <span className={`hamburger ${isMobileMenuOpen ? 'active' : ''}`}>
@@ -68,7 +69,7 @@ const Navbar = ({ isAuthenticated, logout, user }) => {
           <span></span>
         </span>
       </button>
-      
+
       <div className={`navbar-menu ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
         {isAuthenticated ? (
           <>
@@ -112,26 +113,26 @@ const Dashboard = () => {
         <h2><span className="header-icon">🏛️</span>Command Center</h2>
         <p className="welcome-message">Welcome to the Battle Arena, Commander!</p>
       </div>
-      
+
       <div className="dashboard-actions battle-grid">
         <Link to="/profile" className="dashboard-card intel-card">
           <div className="card-icon">🛡️</div>
           <h3>Intel Dashboard</h3>
           <p>Commander profile and combat statistics</p>
         </Link>
-        
+
         <Link to="/history" className="dashboard-card archives-card">
           <div className="card-icon">⚔️</div>
           <h3>Battle Archives</h3>
           <p>Review combat history and performance metrics</p>
         </Link>
-        
+
         <Link to="/wallet" className="dashboard-card arsenal-card">
           <div className="card-icon">⚙️</div>
           <h3>Arsenal Management</h3>
           <p>Deploy and extract combat resources</p>
         </Link>
-        
+
         {/* Combat Deployment card */}
         <div className="dashboard-card combat-card">
           <div className="card-icon">🚀</div>
@@ -150,7 +151,7 @@ const Dashboard = () => {
 // Separate component to access context within Router
 const AppContent = () => {
   const { isAuthenticated, user, logout } = useContext(AuthContext);
-  
+
   return (
     <div className="app">
       <Navbar isAuthenticated={isAuthenticated} logout={logout} user={user} />
@@ -163,7 +164,7 @@ const AppContent = () => {
           <Route path="/" element={
             isAuthenticated ?
               <StakeOutBet /> :
-              <Navigate to="/login" replace />
+              <LandingPage />
           } />
 
           <Route path="/login" element={

@@ -116,7 +116,9 @@ app.use('/api', apiLimiter);
 app.use('/api/socket-token', socketLimiter);
 
 // Routes with specific rate limiters
-app.use('/api', authLimiter, authRoutes); // Auth routes get strict limiting
+// Auth routes are mounted at /api to match frontend expectations (/api/register, /api/login)
+// Rate limiters are applied within the auth routes file for specific endpoints
+app.use('/api', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/bet', gameLimiter, betsRoutes); // Game actions get specific limiting

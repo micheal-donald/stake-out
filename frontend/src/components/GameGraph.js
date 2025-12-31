@@ -1,381 +1,349 @@
 // components/GameGraph.js
-import React, { useState, useEffect, useRef } from 'react';
+// Crash game visualization - shows multiplier curve in real-time
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 const GameGraph = ({ multiplier, dangerLevel, getDynamicColor }) => {
-  const [graphPoints, setGraphPoints] = useState([{ time: 0, value: 1 }]);
+  const [points, setPoints] = useState([]);
   const [ripples, setRipples] = useState([]);
-  const animationRef = useRef(null);
-  const startTimeRef = useRef(Date.now());
-  const svgRef = useRef(null);
-  const pulseOpacity = useRef(0.5);
-  const pulseDirection = useRef(1);
+  const startTimeRef = useRef(null);
+  const lastMultiplierRef = useRef(1);
   const dynamicColor = getDynamicColor;
-  
-  // Generate grid lines
-  const generateGridLines = (maxValue) => {
-    const lines = [];
-    
-    // Adjust the grid line spacing based on the maximum value
-    // to avoid too many or too few grid lines
-    let step = 1;
-    if (maxValue > 5 && maxValue <= 10) step = 2;
-    else if (maxValue > 10 && maxValue <= 20) step = 5;
-    else if (maxValue > 20 && maxValue <= 50) step = 10;
-    else if (maxValue > 50) step = 20;
-    
-    for (let i = step; i <= maxValue; i += step) {
-      lines.push({
-        y: 100 - (i / maxValue) * 95,
-        value: i
-      });
-    }
-    
-    // Add a line for the starting value if it's not already included
-    if (step > 1) {
-      lines.unshift({
-        y: 100 - (1 / maxValue) * 95,
-        value: 1
-      });
-    }
-    
-    return lines;
-  };
-  
-  // Generate line path for the graph
-  const generateLinePath = (points, maxTime, maxValue) => {
-    if (points.length < 2) return '';
-    
-    return points.reduce((path, point, index) => {
-      const x = (point.time / maxTime) * 100;
-      const y = 100 - (point.value / maxValue) * 95;
-      return path + (index === 0 ? `M${x},${y}` : ` L${x},${y}`);
-    }, '');
-  };
-  
-  // Generate area path for the fill under the curve
-  const generateAreaPath = (points, maxTime, maxValue) => {
-    if (points.length < 2) return '';
-    
-    let path = points.reduce((path, point, index) => {
-      const x = (point.time / maxTime) * 100;
-      const y = 100 - (point.value / maxValue) * 95;
-      return path + (index === 0 ? `M${x},${y}` : ` L${x},${y}`);
-    }, '');
-    
-    // Add points to create a closed path for fill
-    const lastX = (points[points.length - 1].time / maxTime) * 100;
-    path += ` L${lastX},100 L0,100 Z`;
-    return path;
-  };
-  
-  // Reset the graph when multiplier changes back to 1
+
+  // Graph scale calculations - memoized for consistency
+  const scale = useMemo(() => {
+    // Time scale: 10 seconds minimum, grows with game length
+    const maxTime = Math.max(10, points.length > 0 ? points[points.length - 1].t * 1.2 : 10);
+
+    // Value scale: dynamic based on current multiplier
+    let maxValue;
+    if (multiplier <= 2) maxValue = 3;
+    else if (multiplier <= 5) maxValue = Math.max(5, multiplier * 1.3);
+    else if (multiplier <= 10) maxValue = Math.max(10, multiplier * 1.2);
+    else if (multiplier <= 20) maxValue = Math.max(20, multiplier * 1.15);
+    else maxValue = Math.max(30, multiplier * 1.1);
+
+    return { maxTime, maxValue };
+  }, [multiplier, points]);
+
+  // Convert data point to SVG coordinates
+  const toSVG = useCallback((t, v) => {
+    const x = (t / scale.maxTime) * 100;
+    const y = 100 - ((v - 1) / (scale.maxValue - 1)) * 90; // Leave 10% margin at top
+    return { x: Math.max(0, Math.min(100, x)), y: Math.max(5, Math.min(100, y)) };
+  }, [scale]);
+
+  // Reset when multiplier goes back to 1
   useEffect(() => {
-    if (multiplier === 1) {
-      setGraphPoints([{ time: 0, value: 1 }]);
-      startTimeRef.current = Date.now();
-      setRipples([]); // Clear any existing ripples
+    if (multiplier <= 1.01 && lastMultiplierRef.current > 1.5) {
+      // Game ended and new round starting
+      setPoints([]);
+      setRipples([]);
+      startTimeRef.current = null;
     }
+    lastMultiplierRef.current = multiplier;
   }, [multiplier]);
 
-  // Create ripple effect
-  const addRipple = (x, y) => {
+  // Add new point on each multiplier update
+  useEffect(() => {
+    if (multiplier < 1) return;
+
+    // Initialize start time on first point
+    if (!startTimeRef.current) {
+      startTimeRef.current = Date.now();
+    }
+
+    const elapsed = (Date.now() - startTimeRef.current) / 1000;
+
+    setPoints(prev => {
+      // Don't add duplicate points for same multiplier
+      if (prev.length > 0 && prev[prev.length - 1].v === multiplier) {
+        return prev;
+      }
+
+      const newPoint = { t: elapsed, v: multiplier };
+
+      // Keep max 200 points for performance
+      const newPoints = [...prev, newPoint].slice(-200);
+      return newPoints;
+    });
+  }, [multiplier]);
+
+  // Generate smooth bezier curve path
+  const generatePath = useCallback(() => {
+    if (points.length < 2) return '';
+
+    const svgPoints = points.map(p => toSVG(p.t, p.v));
+
+    // Start with first point
+    let path = `M ${svgPoints[0].x.toFixed(2)} ${svgPoints[0].y.toFixed(2)}`;
+
+    // Use quadratic bezier curves for smooth line
+    for (let i = 1; i < svgPoints.length; i++) {
+      const prev = svgPoints[i - 1];
+      const curr = svgPoints[i];
+
+      // Control point for smooth curve
+      const cpX = (prev.x + curr.x) / 2;
+      const cpY = prev.y; // Keep control point at previous y for smooth rise
+
+      path += ` Q ${cpX.toFixed(2)} ${cpY.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.y.toFixed(2)}`;
+    }
+
+    return path;
+  }, [points, toSVG]);
+
+  // Generate area fill path (closed shape under curve)
+  const generateAreaPath = useCallback(() => {
+    if (points.length < 2) return '';
+
+    const svgPoints = points.map(p => toSVG(p.t, p.v));
+
+    let path = `M 0 100`; // Start at bottom-left
+    path += ` L ${svgPoints[0].x.toFixed(2)} ${svgPoints[0].y.toFixed(2)}`; // Line to first point
+
+    // Follow the curve
+    for (let i = 1; i < svgPoints.length; i++) {
+      const prev = svgPoints[i - 1];
+      const curr = svgPoints[i];
+      const cpX = (prev.x + curr.x) / 2;
+      const cpY = prev.y;
+      path += ` Q ${cpX.toFixed(2)} ${cpY.toFixed(2)}, ${curr.x.toFixed(2)} ${curr.y.toFixed(2)}`;
+    }
+
+    // Close the path
+    const lastX = svgPoints[svgPoints.length - 1].x;
+    path += ` L ${lastX.toFixed(2)} 100 Z`;
+
+    return path;
+  }, [points, toSVG]);
+
+  // Add ripple at current position (called occasionally)
+  const addRipple = useCallback(() => {
+    if (points.length < 2) return;
+
+    const lastPoint = points[points.length - 1];
+    const { x, y } = toSVG(lastPoint.t, lastPoint.v);
+
     const newRipple = {
       id: Date.now(),
       x,
       y,
-      radius: 0,
-      opacity: 0.7,
+      radius: 2,
+      opacity: 0.8,
       color: dynamicColor
     };
-    
-    setRipples(current => [...current, newRipple]);
-    
-    // Remove ripple after animation completes
-    setTimeout(() => {
-      setRipples(current => current.filter(r => r.id !== newRipple.id));
-    }, 2000);
-  };
 
-  // Animation loop
+    setRipples(prev => [...prev.slice(-5), newRipple]); // Keep max 6 ripples
+  }, [points, toSVG, dynamicColor]);
+
+  // Add ripple periodically based on danger level
   useEffect(() => {
-    if (multiplier < 1) return;
-    
-    // Always keep the first point fixed at {0, 1}
-    if (graphPoints.length > 0 && (graphPoints[0].time !== 0 || graphPoints[0].value !== 1)) {
-      setGraphPoints([{ time: 0, value: 1 }, ...graphPoints.slice(1)]);
-    }
-    
-    const updateGraph = () => {
-      const currentTime = Date.now();
-      const elapsed = (currentTime - startTimeRef.current) / 1000;
-      
-      // Create smooth exponential growth
-      const growthFactor = dangerLevel === 'extreme' ? 1.001 : 
-                           dangerLevel === 'risky' ? 0.0008 : 
-                           dangerLevel === 'medium' ? 0.0006 : 0.0005;
-                           
-      const newMultiplier = parseFloat((multiplier * Math.pow(1 + growthFactor, elapsed * 1000)).toFixed(2));
-      
-      // Pulse the opacity of the area fill for visual interest
-      pulseOpacity.current += 0.01 * pulseDirection.current;
-      if (pulseOpacity.current >= 0.7) {
-        pulseDirection.current = -1;
-      } else if (pulseOpacity.current <= 0.3) {
-        pulseDirection.current = 1;
-      }
-      
-      // Add a new point every few frames
-      if (elapsed > 0.05) {
-        startTimeRef.current = currentTime;
-        
-        setGraphPoints(prevPoints => {
-          // Calculate time point based on the length of the array
-          const lastTime = prevPoints.length > 0 ? prevPoints[prevPoints.length - 1].time : 0;
-          const newTime = lastTime + 0.1;
-          const newValue = newMultiplier;
-          
-          // Occasionally add a ripple effect at new points for visual interest
-          if (Math.random() < 0.15 && dangerLevel !== 'safe') {
-            // Calculate position for the ripple
-            const maxTime = Math.max(10, newTime * 1.1);
-            const maxValue = Math.max(5, newMultiplier * 1.2);
-            const rippleX = (newTime / maxTime) * 100;
-            const rippleY = 100 - (newValue / maxValue) * 95;
-            
-            addRipple(rippleX, rippleY);
-          }
-          
-          // Ensure we always keep the first point at {0, 1}
-          const newPoints = prevPoints.length > 0 ? 
-            [{ time: 0, value: 1 }, ...prevPoints.slice(1), { time: newTime, value: newValue }] : 
-            [{ time: 0, value: 1 }, { time: newTime, value: newValue }];
-          
-          // Limit the array to a reasonable size
-          if (newPoints.length > 100) {
-            return [{ time: 0, value: 1 }, ...newPoints.slice(2, 101)];
-          }
-          return newPoints;
-        });
-      }
-      
-      animationRef.current = requestAnimationFrame(updateGraph);
-    };
-    
-    animationRef.current = requestAnimationFrame(updateGraph);
-    
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [multiplier, graphPoints, dangerLevel, dynamicColor]);
-  
-  // Prepare data for rendering
-  const maxTime = Math.max(10, graphPoints.length > 0 ? graphPoints[graphPoints.length - 1].time * 1.1 : 10);
-  
-  // Always keep the scale growing with the multiplier to prevent horizontal line
-  // Use a dynamic scale that grows more slowly at higher values
-  const maxValue = multiplier <= 5 ? Math.max(5, multiplier * 1.5) :
-                   multiplier <= 10 ? Math.max(10, multiplier * 1.3) :
-                   multiplier <= 20 ? Math.max(15, multiplier * 1.2) :
-                   Math.max(20, multiplier * 1.15);
-  
-  const linePath = generateLinePath(graphPoints, maxTime, maxValue);
-  const areaPath = generateAreaPath(graphPoints, maxTime, maxValue);
-  const gridLines = generateGridLines(maxValue);
-  
-  // Calculate the position of the last point for the circle indicator
-  const lastPoint = graphPoints.length > 0 ? {
-    cx: (graphPoints[graphPoints.length - 1].time / maxTime) * 100,
-    cy: 100 - (graphPoints[graphPoints.length - 1].value / maxValue) * 95
-  } : { cx: 0, cy: 95 };
+    if (dangerLevel === 'safe' || points.length < 5) return;
 
-  // Get glow filter id based on danger level
-  const getGlowFilterId = () => {
-    switch(dangerLevel) {
-      case 'extreme': return 'glow-red';
-      case 'risky': return 'glow-orange';
-      case 'medium': return 'glow-yellow';
-      default: return 'glow-blue';
-    }
-  };
+    const interval = dangerLevel === 'extreme' ? 300 :
+      dangerLevel === 'risky' ? 500 : 800;
 
-  // Update ripples animation
+    const timer = setInterval(addRipple, interval);
+    return () => clearInterval(timer);
+  }, [dangerLevel, addRipple, points.length]);
+
+  // Animate ripples
   useEffect(() => {
     if (ripples.length === 0) return;
-    
-    const updateRipples = () => {
-      setRipples(current => 
-        current.map(ripple => ({
-          ...ripple,
-          radius: ripple.radius + 0.5,
-          opacity: Math.max(0, ripple.opacity - 0.01)
-        }))
+
+    const animate = () => {
+      setRipples(prev =>
+        prev
+          .map(r => ({
+            ...r,
+            radius: r.radius + 0.8,
+            opacity: r.opacity - 0.02
+          }))
+          .filter(r => r.opacity > 0)
       );
     };
-    
-    const rippleInterval = setInterval(updateRipples, 30);
-    return () => clearInterval(rippleInterval);
-  }, [ripples]);
+
+    const timer = setInterval(animate, 50);
+    return () => clearInterval(timer);
+  }, [ripples.length]);
+
+  // Generate grid lines
+  const gridLines = useMemo(() => {
+    const lines = [];
+    let step = 1;
+    if (scale.maxValue > 5) step = 2;
+    if (scale.maxValue > 10) step = 5;
+    if (scale.maxValue > 25) step = 10;
+    if (scale.maxValue > 50) step = 20;
+
+    for (let v = 1; v <= scale.maxValue; v += step) {
+      const { y } = toSVG(0, v);
+      if (y > 5 && y < 100) {
+        lines.push({ y, label: `${v.toFixed(1)}x` });
+      }
+    }
+    return lines;
+  }, [scale.maxValue, toSVG]);
+
+  // Current point position for indicator
+  const currentPos = useMemo(() => {
+    if (points.length === 0) return { x: 0, y: 95 };
+    const last = points[points.length - 1];
+    return toSVG(last.t, last.v);
+  }, [points, toSVG]);
+
+  // Get glow filter based on danger level
+  const glowFilter = dangerLevel === 'extreme' ? 'url(#glow-red)' :
+    dangerLevel === 'risky' ? 'url(#glow-pink)' :
+      dangerLevel === 'medium' ? 'url(#glow-gold)' : 'url(#glow-cyan)';
+
+  const linePath = generatePath();
+  const areaPath = generateAreaPath();
 
   return (
     <svg
-      ref={svgRef}
       width="100%"
       height="100%"
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
       className="absolute inset-0"
     >
-      {/* Define filters for glow effects */}
+      {/* Glow Filters */}
       <defs>
-        <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="1" result="blur" />
-          <feFlood floodColor="#4299e1" floodOpacity="0.7" result="color" />
-          <feComposite in="color" in2="blur" operator="in" result="glow" />
-          <feMerge>
-            <feMergeNode in="glow" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-        
-        <filter id="glow-yellow" x="-20%" y="-20%" width="140%" height="140%">
+        <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.5" result="blur" />
-          <feFlood floodColor="#ecc94b" floodOpacity="0.7" result="color" />
-          <feComposite in="color" in2="blur" operator="in" result="glow" />
+          <feFlood floodColor="#00D1FF" floodOpacity="0.8" />
+          <feComposite in2="blur" operator="in" />
           <feMerge>
-            <feMergeNode in="glow" />
+            <feMergeNode />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        
-        <filter id="glow-orange" x="-20%" y="-20%" width="140%" height="140%">
+        <filter id="glow-gold" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="2" result="blur" />
-          <feFlood floodColor="#ed8936" floodOpacity="0.8" result="color" />
-          <feComposite in="color" in2="blur" operator="in" result="glow" />
+          <feFlood floodColor="#FFD700" floodOpacity="0.85" />
+          <feComposite in2="blur" operator="in" />
           <feMerge>
-            <feMergeNode in="glow" />
+            <feMergeNode />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        
-        <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+        <filter id="glow-pink" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="2.5" result="blur" />
-          <feFlood floodColor="#f56565" floodOpacity="0.9" result="color" />
-          <feComposite in="color" in2="blur" operator="in" result="glow" />
+          <feFlood floodColor="#FF2D75" floodOpacity="0.9" />
+          <feComposite in2="blur" operator="in" />
           <feMerge>
-            <feMergeNode in="glow" />
+            <feMergeNode />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feFlood floodColor="#FF3B30" floodOpacity="0.95" />
+          <feComposite in2="blur" operator="in" />
+          <feMerge>
+            <feMergeNode />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        {/* Area gradient */}
+        <linearGradient id="areaGradient" x1="0%" y1="100%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor={dynamicColor} stopOpacity="0.05" />
+          <stop offset="100%" stopColor={dynamicColor} stopOpacity="0.3" />
+        </linearGradient>
       </defs>
 
       {/* Grid Lines */}
       {gridLines.map((line, i) => (
-        <g key={`h-grid-${i}`}>
+        <g key={i}>
           <line
-            x1="0"
-            y1={line.y}
-            x2="100"
-            y2={line.y}
-            stroke="#374151"
-            strokeWidth="0.2"
+            x1="0" y1={line.y}
+            x2="100" y2={line.y}
+            stroke="#334155"
+            strokeWidth="0.15"
             strokeDasharray="2,2"
           />
-          <text x="1" y={line.y - 1} fill="#9CA3AF" fontSize="3">
-            {line.value.toFixed(1)}x
+          <text x="2" y={line.y - 1.5} fill="#64748B" fontSize="3" fontFamily="monospace">
+            {line.label}
           </text>
         </g>
       ))}
 
-      {/* Vertical Time Markers */}
-      {[25, 50, 75].map((percent, i) => (
-        <line
-          key={`v-grid-${i}`}
-          x1={percent}
-          y1="0"
-          x2={percent}
-          y2="100"
-          stroke="#374151"
-          strokeWidth="0.2"
-          strokeDasharray="2,2"
-        />
+      {/* Vertical grid lines */}
+      {[25, 50, 75].map(x => (
+        <line key={x} x1={x} y1="5" x2={x} y2="100" stroke="#334155" strokeWidth="0.1" strokeDasharray="2,2" />
       ))}
 
-      {/* Ripple Effects */}
-      {ripples.map(ripple => (
+      {/* Ripple effects */}
+      {ripples.map(r => (
         <circle
-          key={ripple.id}
-          cx={ripple.x}
-          cy={ripple.y}
-          r={ripple.radius}
+          key={r.id}
+          cx={r.x}
+          cy={r.y}
+          r={r.radius}
           fill="none"
-          stroke={ripple.color}
-          strokeWidth="0.5"
-          opacity={ripple.opacity}
+          stroke={r.color}
+          strokeWidth="0.4"
+          opacity={r.opacity}
         />
       ))}
 
-      {/* Area under curve */}
-      <path 
-        d={areaPath} 
-        fill={dynamicColor} 
-        fillOpacity={pulseOpacity.current}
-        className="transition-all duration-100"
-      />
+      {/* Area fill */}
+      {areaPath && (
+        <path
+          d={areaPath}
+          fill="url(#areaGradient)"
+        />
+      )}
 
-      {/* Graph Line */}
-      <path
-        d={linePath}
+      {/* Main curve */}
+      {linePath && (
+        <path
+          d={linePath}
+          fill="none"
+          stroke={dynamicColor}
+          strokeWidth="0.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          filter={glowFilter}
+        />
+      )}
+
+      {/* Current position indicator - outer glow ring */}
+      <circle
+        cx={currentPos.x}
+        cy={currentPos.y}
+        r={dangerLevel === 'extreme' ? 3 : dangerLevel === 'risky' ? 2.5 : 2}
         fill="none"
         stroke={dynamicColor}
-        strokeWidth="0.8"
-        strokeLinecap="round"
-        filter={`url(#${getGlowFilterId()})`}
+        strokeWidth="0.3"
+        opacity="0.5"
+        className={dangerLevel === 'extreme' ? 'animate-ping' : ''}
       />
 
-      {/* Current Indicator Point */}
+      {/* Current position indicator - solid dot */}
       <circle
-        cx={lastPoint.cx}
-        cy={lastPoint.cy}
-        r={dangerLevel === 'extreme' ? 1.8 : dangerLevel === 'risky' ? 1.5 : 1.2}
+        cx={currentPos.x}
+        cy={currentPos.y}
+        r={1.2}
         fill={dynamicColor}
-        filter={`url(#${getGlowFilterId()})`}
-        className={dangerLevel === 'extreme' ? 'animate-ping' : dangerLevel === 'risky' ? 'animate-pulse' : ''}
+        filter={glowFilter}
       />
-      
-      {/* Secondary indicator point (always visible, doesn't animate) */}
-      <circle
-        cx={lastPoint.cx}
-        cy={lastPoint.cy}
-        r={dangerLevel === 'extreme' ? 1.2 : dangerLevel === 'risky' ? 1 : 0.8}
-        fill={dynamicColor}
-      />
-      {/* Multiplier label centered on graph */}
+
+      {/* Multiplier text in center */}
       <text
         x="50"
-        y="50"
+        y="45"
         fill={dynamicColor}
-        fontSize="6"
+        fontSize="8"
         fontWeight="bold"
         textAnchor="middle"
         dominantBaseline="middle"
+        filter={glowFilter}
       >
         {multiplier.toFixed(2)}x
       </text>
-
-      {/* Rocket indicator at the latest point */}
-      <g
-        transform={`translate(${lastPoint.cx - 1.2}, ${lastPoint.cy - 2}) scale(0.1)`}
-        fill="none"
-        stroke={dynamicColor}
-        strokeWidth="1"
-      >
-        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
-        <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
-        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
-        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
-      </g>
     </svg>
   );
 };

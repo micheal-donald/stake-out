@@ -1,89 +1,41 @@
 // components/MultiplierDisplay.js
-import React, { useState, useEffect } from 'react';
-import { getDynamicColor, getGlowEffect } from '../utils/gameHelpers';
+// Hero multiplier display - THE star of the show
+import React, { useMemo } from 'react';
 
-const MultiplierDisplay = ({ multiplier, dangerLevel }) => {
-  const [dynamicColor, setDynamicColor] = useState('');
-  const [glowEffect, setGlowEffect] = useState('');
-  const [fontSize, setFontSize] = useState(2.5);
-  const [shakeFactor, setShakeFactor] = useState(0);
-  
-  // Dynamic sizing and effects based on multiplier and danger level
-  useEffect(() => {
-    const updateSize = () => {
-      // Use relative sizing instead of fixed pixels for better mobile responsiveness
-      const baseSize = window.innerWidth < 480 ? 1.8 : window.innerWidth < 768 ? 2 : 2.5; // rem units
-      const growthFactor = Math.min(1.8, 1 + (multiplier - 1) * 0.08); // Cap at 1.8x original size
-      setFontSize(baseSize * growthFactor);
-    };
-    
-    updateSize();
-    
-    // Listen for window resize to update size responsively
-    window.addEventListener('resize', updateSize);
-    
-    // Shake effect for extreme multipliers
-    if (dangerLevel === 'extreme') {
-      // Shake increases with multiplier
-      const newShakeFactor = Math.min(3, (multiplier - 5) / 5);
-      setShakeFactor(newShakeFactor);
-    } else {
-      setShakeFactor(0);
-    }
-    
-    return () => window.removeEventListener('resize', updateSize);
-  }, [multiplier, dangerLevel]);
-  
-  // Update dynamic color and glow effect with animation frame
-  useEffect(() => {
-    let animationFrameId;
-    
-    const updateVisualEffects = () => {
-      // Update color based on current multiplier and danger level
-      setDynamicColor(getDynamicColor(multiplier, dangerLevel));
-      setGlowEffect(getGlowEffect(multiplier, dangerLevel));
-      
-      // Continue animation loop
-      animationFrameId = requestAnimationFrame(updateVisualEffects);
-    };
-    
-    // Start animation loop
-    animationFrameId = requestAnimationFrame(updateVisualEffects);
-    
-    // Clean up animation frame on unmount
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [multiplier, dangerLevel]);
-  
-  // Random shake effect
-  const getRandomShake = () => {
-    if (shakeFactor === 0) return { x: 0, y: 0 };
-    
-    return {
-      x: (Math.random() - 0.5) * 2 * shakeFactor,
-      y: (Math.random() - 0.5) * 2 * shakeFactor
-    };
-  };
-  
-  const shake = getRandomShake();
-  
+const MultiplierDisplay = ({ multiplier, dangerLevel, crashed = false }) => {
+  // Determine the intensity class based on multiplier value
+  const intensityClass = useMemo(() => {
+    if (crashed) return 'crashed-multiplier';
+    if (multiplier >= 10) return 'multiplier-extreme';
+    if (multiplier >= 5) return 'multiplier-high';
+    if (multiplier >= 2) return 'multiplier-medium';
+    return '';
+  }, [multiplier, crashed]);
+
+  // Determine if container should show crashed state
+  const containerClass = useMemo(() => {
+    return crashed ? 'multiplier-container crashed' : 'multiplier-container';
+  }, [crashed]);
+
   return (
-    <div
-      className={`absolute font-bold transition-all duration-100 ${
-        dangerLevel === 'extreme' ? 'animate-pulse' : ''
-      }`}
-      style={{
-        top: '50%',
-        left: '50%',
-        transform: `translate(-50%, -50%) translate(${shake.x}px, ${shake.y}px)`,
-        fontSize: `${fontSize}rem`,
-        color: dynamicColor,
-        textShadow: glowEffect,
-        transition: 'font-size 0.2s ease-out'
-      }}
-    >
-      {multiplier.toFixed(2)}x
+    <div className={containerClass}>
+      <div className={`multiplier-display ${intensityClass}`}>
+        {multiplier.toFixed(2)}x
+      </div>
+      {/* Rising indicator for active game */}
+      {!crashed && multiplier > 1 && (
+        <div className="multiplier-status">
+          <span className="status-icon">🚀</span>
+          <span className="status-text">RISING</span>
+        </div>
+      )}
+      {/* Crashed indicator */}
+      {crashed && (
+        <div className="multiplier-status crashed">
+          <span className="status-icon">💥</span>
+          <span className="status-text">CRASHED</span>
+        </div>
+      )}
     </div>
   );
 };

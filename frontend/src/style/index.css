@@ -530,6 +530,25 @@ button.secondary:hover:not(:disabled) {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  position: relative;
+}
+
+.alert-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.alert-close:hover {
+  opacity: 1;
 }
 
 .alert-danger {
